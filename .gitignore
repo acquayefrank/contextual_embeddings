@@ -137,4 +137,8 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+<<<<<<< HEAD
 data/
+=======
+data/
+>>>>>>> 41427bef2e00bc0970597c02b5ad04734ed85d37
