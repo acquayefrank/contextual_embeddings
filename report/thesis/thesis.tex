@@ -1,0 +1,111 @@
+\documentclass[12pt]{thesis} %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% preample %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%% packages %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\usepackage[T1]{fontenc}        % euro quality fonts [T1] (togeth. w/ textcomp)
+\usepackage{textcomp, amssymb}  % additional symbols (there are more packages)
+\usepackage[latin1]{inputenc}   % umlaute in input file
+\usepackage{setspace}           % doublespacing
+\usepackage{anysize}            % margin package sets tighter margins
+\usepackage[all]{xy}            % creating figures within latex
+\usepackage[tight]{subfigure}% subfigures: figures within figures
+
+%\marginsize{1.2in}{0.9in}{1.1in}{0.9in} % small margins
+\marginsize{1.2in}{0.9in}{0.5in}{1.5in} % small margins
+
+\usepackage{ifpdf}              % if pdflatex then ... else ...
+\ifpdf
+  \pdfadjustspacing=1           % make pdflatex behave like latex
+  \usepackage{aeguill}          % PS converted CM fonts for better acro preview
+  \usepackage[pdftex]{graphicx} % graphics packages
+  \usepackage[pdftex]{color}    % color packages
+  \usepackage[pdftex]{thumbpdf} % create thumbnails (run thumbpdf as well)
+  \usepackage[pdftex,colorlinks,%
+              pagebackref=true, % bibliography -> text
+              linktocpage=true, % toc etc: make page number active (not name)
+              plainpages=false, % distinguish roman and arabic pagenumbers
+              bookmarksopen=true,%
+              bookmarksnumbered=true,%
+              pdfauthor={Stefan Schäckeler},%
+              pdftitle={Lorem Ipsum Dolor Sit Amet},% 
+              pdfsubject={PhD Thesis},%
+              pdfkeywords={Embedded Systems, Code Compaction},%
+             ]{hyperref}        % clickabe references
+\else
+  \usepackage[hypertex,
+              plainpages=false, % distinguish roman and arabic pagenumbers
+              linktocpage=true, % toc etc: make page number active (not name)
+             ]{hyperref}        % clickabe references in .dvi
+                                % purposely included before color package
+  \usepackage[dvips]{color}     % color packages; needed by xy
+  \usepackage[dvips]{graphicx}  % graphics packages
+\fi
+
+
+% hyperref must be the second last package and glossary the last package
+
+% index
+\usepackage{makeidx}                       % for \printindex
+\makeindex                                 % creates paper.idx index file
+
+% glossary
+\usepackage[style=super, cols=3]{glossary} % for \printclossary
+\makeglossary                              % creates paper.glo glossary file
+
+
+%%% style and finetuning %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pagestyle{plain}               % pagestyle: headings, empty, plain
+
+% new theorems
+\newtheorem{example}{Example}
+\newtheorem{proof}{Proof}
+
+
+%%% document %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\pagenumbering{roman} % titlepage does not get a number - that's odd, but good.
+
+\ifpdf\pdfbookmark[1]{Title}{label:title}\fi              \input{titlepage.tex}
+
+\newpage                                                     \input{spruch.tex}
+
+{\doublespacing
+\newpage\ifpdf\pdfbookmark[1]{Acknowledgement}{label:ack}\fi\input{acknowledge.tex}
+\newpage\ifpdf\pdfbookmark[1]{Abstract}{label:abst}\fi     \input{abstract.tex}
+}
+
+\newpage\ifpdf\pdfbookmark[1]{Table of Contents}{label:toc}\fi \tableofcontents
+\newpage\ifpdf\pdfbookmark[1]{List of Figures}{label:lof}\fi     \listoffigures
+\newpage\ifpdf\pdfbookmark[1]{List of Tables}{label:lot}\fi       \listoftables
+
+{\doublespacing
+\newpage\pagenumbering{arabic}
+
+\newpage\input{body.tex}
+
+
+% Bibliography and Glossary          (\phantomsection is needed for hyperlinks)
+
+\newpage\phantomsection%
+\addcontentsline{toc}{chapter}{\bibname}              % add Bibliography to TOC
+\bibliographystyle{alpha}\bibliography{references}
+
+
+\newpage\phantomsection%
+\addcontentsline{toc}{chapter}{\indexname}                   % add Index to TOC
+\printindex
+
+\newpage\phantomsection%
+\addcontentsline{toc}{chapter}{Glossary}                  % add Glossary to TOC
+\printglossary
+
+\end{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

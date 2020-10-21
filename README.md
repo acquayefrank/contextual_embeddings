@@ -1,18 +1,21 @@
+
 List of Words:
 http://www.mieliestronk.com/corncob_lowercase.txt
-API for hyponymns
+
+API for hyponymns:
 http://api.datamuse.com/words?rel_spc=Russia
+
+NTK POS Tagg Breakdown:
+https://github.com/nltk/nltk/blob/develop/nltk/app/chunkparser_app.py#L52
+
+SPACY:
+https://spacy.io/usage/linguistic-features#pos-tagging
+
+GLOVE:
+https://nlp.stanford.edu/projects/glove/
+
+
 TODO:
-Stem features:
-Filter out features
 
-All should be script:
+* Closest Word: https://stackoverflow.com/questions/37793118/load-pretrained-glove-vectors-in-python
 
-Check if number of features and number of ones are equal
-Sum up colums this should tell us for eah feature how many words associated to label
-
-Feature name and how many words in decreasing order
-
-Filter out features that have less than 100 words ... basically a threshold
-
-Remove words withouts features
