@@ -1,17 +1,22 @@
 
-List of Words:
+# Compositionality of Distributed Data Representation for Biomedical Data
+
+
+## Sources of Data and Libraries:
+
+List of words used:
 http://www.mieliestronk.com/corncob_lowercase.txt
 
 API for hyponymns:
 http://api.datamuse.com/words?rel_spc=Russia
 
-NTK POS Tagg Breakdown:
+NTK POS Tag Breakdown:
 https://github.com/nltk/nltk/blob/develop/nltk/app/chunkparser_app.py#L52
 
-SPACY:
+SPACY POS Tag:
 https://spacy.io/usage/linguistic-features#pos-tagging
 
-GLOVE:
+GLOVE Embeddings:
 https://nlp.stanford.edu/projects/glove/
 
 

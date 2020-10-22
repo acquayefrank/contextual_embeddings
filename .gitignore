@@ -426,3 +426,6 @@ TSWLatexianTemp*
 #*Notes.bib
 
 models/
+
+!data/.gitignore
+!models/.gitignore
