@@ -2,6 +2,9 @@
 # Compositionality of Distributed Data Representation for Biomedical Data
 
 
+## Folder Structure:
+
+
 ## Sources of Data and Libraries:
 
 List of words used:
@@ -23,4 +26,5 @@ https://nlp.stanford.edu/projects/glove/
 TODO:
 
 * Closest Word: https://stackoverflow.com/questions/37793118/load-pretrained-glove-vectors-in-python
+
 
