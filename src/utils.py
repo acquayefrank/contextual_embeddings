@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
 from data import FINAL_DATA
-from models import GLOVE_6B_50D, GLOVE_6B_300D
+from models import GLOVE_6B_50D, GLOVE_6B_100D, GLOVE_6B_200D, GLOVE_6B_300D
 
 
 fig_size = (15,10)
@@ -22,6 +22,18 @@ sns.set(
     style="white" # nicer layout
     
 )
+
+
+embeddings = {
+    "GLOVE_6B_50D": (GLOVE_6B_50D, 50),
+    "GLOVE_6B_100D": (GLOVE_6B_100D, 100),
+    "GLOVE_6B_200D": (GLOVE_6B_200D, 200),
+    "GLOVE_6B_300D": (GLOVE_6B_300D, 300)
+}
+
+
+# This is set to None to prevent wierd erros
+WORD_EMBEDDINGS_MODEL = {}
 
 
 class Logger:
@@ -80,7 +92,9 @@ class Logger:
         self.writer.add_text("Description", time_str)
 
 
-def _load_glove_model(File=GLOVE_6B_300D):
+def _load_glove_model(File=None):
+    if File is None:
+        File, _ = embeddings.get("GLOVE_6B_300D")
     print("Loading Glove Model")
     gloveModel = {}
     with open(File, "r", encoding="utf8") as f:
@@ -93,11 +107,8 @@ def _load_glove_model(File=GLOVE_6B_300D):
     return gloveModel
 
 
-GLOVE_MODEL = _load_glove_model()
-
-
 def _get_word_embeddings(word):
-    return GLOVE_MODEL.get(word, None)
+    return WORD_EMBEDDINGS_MODEL.get(word, None)
 
 
 def get_device():
@@ -259,3 +270,13 @@ def evaluate(model, x_data, y_data):
         "precision": precision,
         "recall": recall,
     }
+
+####################################################### Get all words ##########################################################
+def get_words(threshold=100):
+    df = pd.read_csv(FINAL_DATA)
+    subset = df[df.columns.difference(['actual_words', 'GLOVE.6B'])]
+    # remove columns below threshold
+    df_with_threshold = subset.loc[:, (subset.sum(axis=0) >= threshold)].copy()
+    return df_with_threshold.columns
+
+####################################################### End all words ##########################################################
