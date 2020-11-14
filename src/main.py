@@ -64,8 +64,8 @@ def main(args):
         training_generator = torch.utils.data.DataLoader(training_set, **params)
 
         # currently not in use
-        validation_set = DatasetLoader(args.word, "validation")
-        validation_generator = torch.utils.data.DataLoader(validation_set, **params)
+        # validation_set = DatasetLoader(args.word, "validation")
+        # validation_generator = torch.utils.data.DataLoader(validation_set, **params)
 
         criterion = torch.nn.BCELoss(reduction="mean")
 
@@ -76,7 +76,7 @@ def main(args):
 
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda:0" if use_cuda else "cpu")
-        torch.backends.cudnn.benchmark = True
+        # torch.backends.cudnn.benchmark = True
 
         model.to(device)
 
@@ -106,7 +106,7 @@ def main(args):
                 
                 running_loss += loss.item()
 
-                if i % 10 == 9:    # every 10 mini-batches...
+                if i % 100 == 99:    # every 100 mini-batches...
 
                     # ...log the running loss
                     writer.add_scalar(f'{word}: training loss',
