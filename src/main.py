@@ -56,7 +56,12 @@ def main(args):
     utils.WORD_EMBEDDINGS_MODEL = _load_glove_model(File=file_path)
 
     writer.add_text("Description", f"Number of words being trained: {len(words)}")
+    total_number_of_words = len(words)
+    print(f"Total Number of words: {total_number_of_words}")
     for word in words:
+        print(f"{word}: is being processed")
+        total_number_of_words = total_number_of_words - 1
+        print(f"{total_number_of_words} word(s) left to process after the current word")
         args.word = word
         writer.add_text("Description", f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings}")
 
@@ -80,10 +85,11 @@ def main(args):
 
         model.to(device)
 
-        running_loss = 0.0
+        loss_values = []
         for epoch in range(max_epochs):
             # Training
-        
+            running_loss = 0.0
+
             for i, data in enumerate(training_generator, 0):
                 # data is a list of [features, labels]
                 features, labels = data
@@ -104,22 +110,25 @@ def main(args):
                 loss.backward()
                 optimizer.step()
                 
-                running_loss += loss.item()
+                running_loss += loss.item() * features.size(0)
 
-                if i % 100 == 99:    # every 100 mini-batches...
+            loss_values.append(running_loss / len(training_generator))
+            writer.add_scalar(f'{word}: training loss', running_loss / len(training_generator), epoch)
+                
+                # if i % 100 == 99:    # every 100 mini-batches...
 
-                    # ...log the running loss
-                    writer.add_scalar(f'{word}: training loss',
-                                    running_loss / 1000,
-                                    epoch * len(training_generator) + i)
+                #     # ...log the running loss
+                #     writer.add_scalar(f'{word}: training loss',
+                #                     running_loss / 1000,
+                #                     epoch * len(training_generator) + i)
 
-                    # ...log a Matplotlib Figure showing the model's predictions on a
-                    # random mini-batch
+                #     # ...log a Matplotlib Figure showing the model's predictions on a
+                #     # random mini-batch
 
-                    writer.add_figure(f'{word}: predictions vs. actuals',
-                                plot_classes_preds(model, features, labels),
-                                global_step=epoch * len(training_generator) + i)
-                    running_loss = 0.0
+                #     writer.add_figure(f'{word}: predictions vs. actuals',
+                #                 plot_classes_preds(model, features, labels),
+                #                 global_step=epoch * len(training_generator) + i)
+                #     running_loss = 0.0
 
             # # Validation
             # with torch.set_grad_enabled(False):
@@ -164,7 +173,7 @@ def main(args):
 
         writer.add_graph(model, x_data)
 
-        # writer.add_figure("Learning rates", plot_learning_rate(train_loss))
+        writer.add_figure("Learning Rate", plot_learning_rate(loss_values))
 
         scores = evaluate(model, x_data, y_data)
 
