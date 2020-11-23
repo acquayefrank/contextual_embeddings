@@ -125,7 +125,7 @@ def main(args):
                     running_loss += loss.item() * features.size(0)
 
                 loss_values.append(running_loss / len(training_generator))
-                writer.add_scalar(f'{word}: training loss', running_loss / len(training_generator), epoch)
+                writer.add_scalar(f'Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} training loss', running_loss / len(training_generator), epoch)
                     
 
             # Tests and Accuracies
@@ -137,21 +137,21 @@ def main(args):
 
             scores = evaluate(model, x_data, y_data)
 
-            writer.add_text(f"{word} Accuracy", str(scores["_accuracy"]))
-            writer.add_text(f"{word} F1 Score", str(scores["_f1_score"]))
-            writer.add_text(f"{word} roc_auc_score", str(scores["_roc_auc_score"]))
-            writer.add_text(f"{word} fpr", str( scores["fpr"] ))
-            writer.add_text(f"{word} tpr", str( scores["tpr"] ))
-            writer.add_text(f"{word} average thresholds", str( scores["thresholds"] ))
-            writer.add_text(f"{word} _auc", str(scores["_auc"]))
-            writer.add_text(f"{word} Precision", str( scores["precision"] ))
-            writer.add_text(f"{word} Recall", str( scores["recall"] ))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Accuracy", str(scores["_accuracy"]))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} F1 Score", str(scores["_f1_score"]))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} roc_auc_score", str(scores["_roc_auc_score"]))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} fpr", str( scores["fpr"] ))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} tpr", str( scores["tpr"] ))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} average thresholds", str( scores["thresholds"] ))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} _auc", str(scores["_auc"]))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Precision", str( scores["precision"] ))
+            writer.add_text(f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Recall", str( scores["recall"] ))
 
             writer.add_figure(
-                f"{word} False Positive Rate", plot_tpr(scores["fpr"], scores["tpr"], args.word)
+                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} False Positive Rate", plot_tpr(scores["fpr"], scores["tpr"], args.word)
             )
             writer.add_figure(
-                f"{word} Precision vs Recall",
+                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Precision vs Recall",
                 plot_precision_recall(scores["recall"], scores["precision"], args.word),
             )
 
