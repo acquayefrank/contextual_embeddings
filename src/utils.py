@@ -6,21 +6,35 @@ import pandas as pd
 import torch
 import seaborn as sns
 from sklearn import metrics
-from sklearn.metrics import (accuracy_score, f1_score, precision_recall_curve,
-                             roc_auc_score)
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_recall_curve,
+    roc_auc_score,
+)
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
 from data import FINAL_DATA
-from models import GLOVE_6B_50D, GLOVE_6B_100D, GLOVE_6B_200D, GLOVE_6B_300D
+from models import (
+    GLOVE_6B_50D,
+    GLOVE_6B_100D,
+    GLOVE_6B_200D,
+    GLOVE_6B_300D,
+    GLOVE_42B_300D,
+)
 
 
-fig_size = (15,10)
+fig_size = (15, 10)
 sns.set(
-    rc={'figure.figsize':fig_size, "font.size":15,"axes.titlesize":15,"axes.labelsize":15}, 
-    style="white" # nicer layout
-    
+    rc={
+        "figure.figsize": fig_size,
+        "font.size": 15,
+        "axes.titlesize": 15,
+        "axes.labelsize": 15,
+    },
+    style="white",  # nicer layout
 )
 
 
@@ -28,7 +42,8 @@ embeddings = {
     "GLOVE_6B_50D": (GLOVE_6B_50D, 50),
     "GLOVE_6B_100D": (GLOVE_6B_100D, 100),
     "GLOVE_6B_200D": (GLOVE_6B_200D, 200),
-    "GLOVE_6B_300D": (GLOVE_6B_300D, 300)
+    "GLOVE_6B_300D": (GLOVE_6B_300D, 300),
+    "GLOVE_42B_300D": (GLOVE_42B_300D, 300),
 }
 
 
@@ -157,25 +172,26 @@ def data_loader(word):
 
 
 class DatasetLoader(torch.utils.data.Dataset):
-    'Characterizes a dataset for PyTorch'
+    "Characterizes a dataset for PyTorch"
+
     def __init__(self, word, selected_partition):
-        'Initialization'
+        "Initialization"
         x_data, y_data, indexes = data_loader(word)
 
         # Datasets
-        partition = {'train': indexes, 'validation': indexes}
+        partition = {"train": indexes, "validation": indexes}
         self.list_IDs = partition[selected_partition]
 
         self.labels = dict(zip(indexes, y_data))
-        
+
         self.features = dict(zip(indexes, x_data))
 
     def __len__(self):
-        'Denotes the total number of samples'
+        "Denotes the total number of samples"
         return len(self.list_IDs)
 
     def __getitem__(self, index):
-        'Generates one sample of data'
+        "Generates one sample of data"
         # Select sample
         ID = self.list_IDs[index]
 
@@ -184,6 +200,8 @@ class DatasetLoader(torch.utils.data.Dataset):
         y = self.labels[ID]
 
         return X, y
+
+
 ################################# End Load Data ###############################################################
 
 
@@ -194,7 +212,7 @@ def plot_learning_rate(train_loss):
     plt.yscale("log")
     plt.xlabel("Step")
     plt.ylabel("Learning rate")
-    plt.title('Learning Curve')
+    plt.title("Learning Curve")
     return fig
 
 
@@ -218,9 +236,9 @@ def plot_precision_recall(recall, precision, label):
 
 # helper functions
 def features_to_probs(model, features):
-    '''
+    """
     Generates predictions and corresponding probabilities from a trained
-    '''
+    """
     output = model(features)
     # convert output probabilities to predicted class
     _, preds_tensor = torch.max(output, 1)
@@ -233,10 +251,13 @@ def plot_classes_preds(model, features, labels):
     # plot the features in the batch, along with predicted and true labels
     fig = plt.figure(figsize=(12, 48))
     for idx in np.arange(4):
-        ax = fig.add_subplot(1, 4, idx+1, xticks=[], yticks=[])
+        ax = fig.add_subplot(1, 4, idx + 1, xticks=[], yticks=[])
         ax.set_title("Learning Curve")
     return fig
+
+
 ################################### End Plots ####################################################################
+
 
 def evaluate(model, x_data, y_data):
     y_pred = model(x_data)
@@ -271,12 +292,14 @@ def evaluate(model, x_data, y_data):
         "recall": recall,
     }
 
+
 ####################################################### Get all words ##########################################################
 def get_words(threshold=100):
     df = pd.read_csv(FINAL_DATA)
-    subset = df[df.columns.difference(['actual_words', 'GLOVE.6B'])]
+    subset = df[df.columns.difference(["actual_words", "GLOVE.6B"])]
     # remove columns below threshold
     df_with_threshold = subset.loc[:, (subset.sum(axis=0) >= threshold)].copy()
     return df_with_threshold.columns
+
 
 ####################################################### End all words ##########################################################

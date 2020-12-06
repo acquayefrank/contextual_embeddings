@@ -1,0 +1,40 @@
+One table for 50, 100, 200 and 300 ... Perhaps other gloves
+One table for Word2Vec
+One table for Fasttext
+
+# Single Layered Neuron
+
+
+Do for all features  and present AUC in a table 
+Add data preperation and methodology 
+
+
+Move --- AUC 
+Act --- AUC 
+
+
+Noun --- AUC 
+
+# Try all embeddings
+
+
+https://arxiv.org/pdf/1808.09663.pdf
+
+
+Thesis
+(
+There are more ways to train word vectors in Gensim than just Word2Vec. See also Doc2Vec, FastText and wrappers for VarEmbed and WordRank.
+)
+
+Single Layer Neural Network with one layer and Sigmoid activation
+
+Test on all embeddings with learning rate and optimizer decay rate
+
+More data for training and testing
+
+Analyze weights of logistic regression
+Weights 
+
+Sentiment of words  included in word embeddings 
+
+Biases in word embeddings 

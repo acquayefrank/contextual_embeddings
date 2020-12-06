@@ -1,5 +1,5 @@
 
-# Compositionality of Distributed Data Representation for Biomedical Data
+# Compositionality of Distributed Data Representation
 
 
 ## Folder Structure:
