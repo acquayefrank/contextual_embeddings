@@ -2,6 +2,7 @@ import argparse
 import datetime
 
 import xlsxwriter
+from natsort import natsorted
 from tensorflow.compat.v1.train import summary_iterator
 
 
@@ -39,6 +40,7 @@ def _save_to_excel(meta_data, data):
     col = 0
 
     for m_d in meta_data:
+        keyword = after_keyword = ""
         if "Logging started." in m_d:
             before_keyword, keyword, after_keyword = m_d.partition(
                 "Logging started. Current date and time:"
@@ -70,28 +72,40 @@ def _save_to_excel(meta_data, data):
     worksheet.write(row, col + 1, 100)
     row += 1
 
-    for d in data:
-        worksheet = workbook.add_worksheet(d)
+    lr_accuracy_worksheet = "Accuracy-LogisticRegression"
+    lr_auc_worksheet = "AUC-LogisticRegression"
+    ann_accuracy_worksheet = "Accuracy-SingleLayeredNN"
+    ann_auc_worksheet = "AUC-SingleLayeredNN"
 
-        row = 0
-        col = 0
+    worksheets = [
+        lr_accuracy_worksheet,
+        lr_auc_worksheet,
+        ann_accuracy_worksheet,
+        ann_auc_worksheet,
+    ]
+    embeddings = natsorted(list(data.keys()))
+    for worksheet_name in worksheets:
+        worksheet = workbook.add_worksheet(worksheet_name)
+        for index, embedding in enumerate(embeddings, start=1):
+            worksheet.write(0, 0, "Hypernym")
+            worksheet.write(0, index, embedding)
 
-        tmp_dit = {}
-        for x in data[d]:
-            list_keys = list(x.keys())
-            list_values = list(x.values())
-            if list_keys[0] not in tmp_dit:
-                tmp_dit[list_keys[0]] = [list_values[0]]
-            else:
-                tmp_dit[list_keys[0]].append(list_values[0])
-
-        for key, values in tmp_dit.items():
-            for value in values:
-                print(value)
-                worksheet.write(row, col, key)
-                worksheet.write(row, col + 1, list(value.keys())[0])
-                worksheet.write(row, col + 2, list(value.values())[0])
-                row += 1
+            tmp_dit = {}
+            for x in data[embedding]:
+                list_keys = list(x.keys())
+                list_values = list(x.values())
+                if list_keys[0] not in tmp_dit:
+                    tmp_dit[list_keys[0]] = [list_values[0]]
+                else:
+                    tmp_dit[list_keys[0]].append(list_values[0])
+            row = 1
+            col = index
+            for key, values in tmp_dit.items():
+                worksheet.write(row, 0, key)
+                for value in values:
+                    if list(value.keys())[0] == worksheet_name:
+                        worksheet.write(row, col, list(value.values())[0])
+                        row += 1
 
     workbook.close()
 
