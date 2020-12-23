@@ -1,36 +1,35 @@
 import argparse
-import datetime
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 
-from .models import LogisticRegression
 import src.utils as utils
+from models import TRAINED_MODELS_ROOT
+
+from .models import LogisticRegression, SingleLayeredNN
 from .utils import (
+    DatasetLoader,
     Logger,
+    _load_word_embedding_model,
+    data_loader,
+    embeddings,
     evaluate,
     get_device,
+    get_words,
     plot_learning_rate,
     plot_precision_recall,
     plot_tpr,
-    DatasetLoader,
-    data_loader,
-    plot_classes_preds,
-    _load_glove_model,
-    embeddings,
-    get_words,
 )
 
 
-def main(args):
+def main(script_args):
 
     pytorch_device = f"Device: {get_device()}"
     pytorch_version = f"Pytorch Version: {torch.__version__}"
     print(pytorch_version)
     print(pytorch_device)
-    logger = Logger(args)  # Create a logger.
-    # Print infomration about the logger to the screen.
-    # The amount of the information depends on the verbosity level specified by the user in args.
+    logger = Logger(script_args)  # Create a logger.
+    # Print information about the logger to the screen.
+    # The amount of the information depends on the verbosity level specified by the user in script_args.
     print(logger)
 
     # Print information to tensorboard about the parameters of the training and the model
@@ -40,37 +39,48 @@ def main(args):
     writer.add_text("Description", pytorch_version)
     writer.add_text("Description", pytorch_device)
 
-    # Print args to the screen
-    if args.verbose < 100:
-        print(args)
+    # Print script_args to the screen
+    if script_args.verbose < 100:
+        print(script_args)
     # Print the information about arguments to tensorboard
-    writer.add_text("Description", args.__repr__())
+    writer.add_text("Description", script_args.__repr__())
 
     writer.add_text("Description", logger.param_string)
 
     logger.set_timer()
 
     # Parameters
-    params = {"batch_size": args.batch_size, "shuffle": True, "num_workers": 0}
-    max_epochs = args.epoch_num
+    params = {"batch_size": script_args.batch_size, "shuffle": True, "num_workers": 0}
+    max_epochs = script_args.epoch_num
 
     # Generators
-    if args.all:
+    if script_args.all:
         words = get_words()
     else:
         words = [
-            args.word,
+            script_args.word,
         ]
 
-    if args.all_embeddings:
+    if script_args.all_embeddings:
         word_embeddings = [
             "GLOVE_6B_50D",
             "GLOVE_6B_100D",
             "GLOVE_6B_200D",
             "GLOVE_6B_300D",
+            "GLOVE_42B_300D",
+            "GLOVE_840B_300D",
+            "GLOVE_TWITTER_27B_25D",
+            "GLOVE_TWITTER_27B_50D",
+            "GLOVE_TWITTER_27B_100D",
+            "GLOVE_TWITTER_27B_200D",
+            "WORD2VEC_GOOGLE_NEWS_300D",
+            "FASTTEXT_CRAWL_SUB",
+            "FASTTEXT_CRAWL_VEC_300D",
+            "FASTTEXT_WIKI_SUB_300D",
+            "FASTTEXT_WIKI_VEC_300D",
         ]
     else:
-        word_embeddings = [args.word_embeddings]
+        word_embeddings = [script_args.word_embeddings]
 
     total_number_of_word_embeddings = len(word_embeddings)
     writer.add_text(
@@ -86,9 +96,13 @@ def main(args):
             f"{total_number_of_word_embeddings} word_embedding(s) left to process after the current word_embedding"
         )
 
-        args.word_embeddings = word_embedding
-        file_path, num_features = embeddings.get(args.word_embeddings)
-        utils.WORD_EMBEDDINGS_MODEL = _load_glove_model(File=file_path)
+        script_args.word_embeddings = word_embedding
+        file_path, num_features, word_embedding_type = embeddings.get(
+            script_args.word_embeddings
+        )
+        utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
+            file=file_path, word_embedding_type=word_embedding_type
+        )
 
         total_number_of_words = len(words)
         writer.add_text(
@@ -102,115 +116,144 @@ def main(args):
             print(
                 f"{total_number_of_words} word(s) left to process after the current word"
             )
-            args.word = word
+            script_args.word = word
             writer.add_text(
                 "Description",
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings}",
+                f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}",
             )
+            try:
+                training_set = DatasetLoader(script_args.word, "train")
+            except TypeError as e:
+                print(e)
+                continue
+            # training_set = DatasetLoader(script_args.word, "train")
 
-            training_set = DatasetLoader(args.word, "train")
             training_generator = torch.utils.data.DataLoader(training_set, **params)
 
+            # TODO: Change to CrossEntropy if results are funny but keeping this for now due to
+            # https://pytorch.org/docs/stable/generated/torch.nn.BCELoss.html
             criterion = torch.nn.BCELoss(reduction="mean")
 
-            model = LogisticRegression(num_features, 1)
+            if script_args.all_models:
+                models = [
+                    ("LogisticRegression", LogisticRegression(num_features, 1)),
+                    ("SingleLayeredNN", SingleLayeredNN(num_features, num_features, 1)),
+                ]
+            else:
+                models = [
+                    ("LogisticRegression", LogisticRegression(num_features, 1)),
+                ]
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+            for model_name, model in models:
 
-            use_cuda = torch.cuda.is_available()
-            device = torch.device("cuda:0" if use_cuda else "cpu")
-            # torch.backends.cudnn.benchmark = True
-
-            model.to(device)
-
-            loss_values = []
-            for epoch in range(max_epochs):
-                # Training
-                running_loss = 0.0
-
-                for i, data in enumerate(training_generator, 0):
-                    # data is a list of [features, labels]
-                    features, labels = data
-                    # Transfer to GPU
-                    features, labels = features.to(device), labels.to(device)
-
-                    # zero the parameter gradients
-                    optimizer.zero_grad()
-
-                    # Model computations
-                    model.train()  # Take this out
-
-                    # forward + backward + optimize
-                    predictions = model(features)
-                    # Compute Loss
-                    loss = criterion(predictions, labels)
-                    # Backward pass
-                    loss.backward()
-                    optimizer.step()
-
-                    running_loss += loss.item() * features.size(0)
-
-                loss_values.append(running_loss / len(training_generator))
-                writer.add_scalar(
-                    f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} training loss",
-                    running_loss / len(training_generator),
-                    epoch,
+                optimizer = torch.optim.Adam(
+                    model.parameters(), lr=script_args.learning_rate
                 )
 
-            # Tests and Accuracies
-            x_data, y_data, _ = data_loader(args.word)
+                use_cuda = torch.cuda.is_available()
+                device = torch.device("cuda:0" if use_cuda else "cpu")
+                # torch.backends.cudnn.benchmark = True
 
-            writer.add_graph(model, x_data)
+                model.to(device)
 
-            writer.add_figure("Learning Rate", plot_learning_rate(loss_values))
+                loss_values = []
+                for epoch in range(max_epochs):
+                    # Training
+                    running_loss = 0.0
 
-            scores = evaluate(model, x_data, y_data)
+                    for i, data in enumerate(training_generator, 0):
+                        # data is a list of [features, labels]
+                        features, labels = data
+                        # Transfer to GPU
+                        features, labels = features.to(device), labels.to(device)
 
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Accuracy",
-                str(scores["_accuracy"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} F1 Score",
-                str(scores["_f1_score"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} roc_auc_score",
-                str(scores["_roc_auc_score"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} fpr",
-                str(scores["fpr"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} tpr",
-                str(scores["tpr"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} average thresholds",
-                str(scores["thresholds"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} _auc",
-                str(scores["_auc"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Precision",
-                str(scores["precision"]),
-            )
-            writer.add_text(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Recall",
-                str(scores["recall"]),
-            )
+                        # zero the parameter gradients
+                        optimizer.zero_grad()
 
-            writer.add_figure(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} False Positive Rate",
-                plot_tpr(scores["fpr"], scores["tpr"], args.word),
-            )
-            writer.add_figure(
-                f"Word being trained: {args.word}, Word Embeddings being used: {args.word_embeddings} Precision vs Recall",
-                plot_precision_recall(scores["recall"], scores["precision"], args.word),
-            )
+                        # Model computations
+                        model.train()  # Take this out
+
+                        # forward + backward + optimize
+                        predictions = model(features)
+                        # Compute Loss
+                        loss = criterion(predictions, labels)
+                        # Backward pass
+                        loss.backward()
+                        optimizer.step()
+
+                        running_loss += loss.item() * features.size(0)
+
+                    loss_values.append(running_loss / len(training_generator))
+                    writer.add_scalar(
+                        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings} training loss, Model being used: {model}",
+                        running_loss / len(training_generator),
+                        epoch,
+                    )
+                model_path = (
+                    TRAINED_MODELS_ROOT / f"{script_args.word}_{model_name}.pth"
+                )
+                torch.save(model.state_dict(), model_path)
+                # Tests and Accuracies
+                x_data, y_data, _ = data_loader(script_args.word)
+
+                writer.add_graph(model, x_data)
+
+                writer.add_figure("Learning Rate", plot_learning_rate(loss_values))
+
+                scores = evaluate(model, x_data, y_data)
+
+                writer.add_text(
+                    "Current shape of data being processed",
+                    str(f"x_data: {x_data.shape} and y_data: {y_data.shape}"),
+                )
+
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, Accuracy",
+                    str(scores["_accuracy"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, F1 Score",
+                    str(scores["_f1_score"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, roc_auc_score",
+                    str(scores["_roc_auc_score"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, fpr",
+                    str(scores["fpr"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, tpr",
+                    str(scores["tpr"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, average thresholds",
+                    str(scores["thresholds"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, _auc",
+                    str(scores["_auc"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, Precision",
+                    str(scores["precision"]),
+                )
+                writer.add_text(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, Recall",
+                    str(scores["recall"]),
+                )
+
+                writer.add_figure(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, False Positive Rate",
+                    plot_tpr(scores["fpr"], scores["tpr"], script_args.word),
+                )
+                writer.add_figure(
+                    f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings}, Model being used: {model}, Precision vs Recall",
+                    plot_precision_recall(
+                        scores["recall"], scores["precision"], script_args.word
+                    ),
+                )
 
     logger.print_time()
     writer.close()
@@ -267,6 +310,13 @@ if __name__ == "__main__":
         type=boolean_string,
         default=False,
         help="If set to true, training is done on all word embeddings. Default: False",
+    )
+    parser.add_argument(
+        "-am",
+        "--all_models",
+        type=boolean_string,
+        default=False,
+        help="If set to true, training is done on all models. Default: False",
     )
     parser.add_argument(
         "-lr",

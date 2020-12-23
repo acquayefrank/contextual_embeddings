@@ -3,8 +3,10 @@ import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 import seaborn as sns
+import torch
+import torch.nn.functional as F
+from gensim.models import KeyedVectors
 from sklearn import metrics
 from sklearn.metrics import (
     accuracy_score,
@@ -14,17 +16,25 @@ from sklearn.metrics import (
 )
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
-import torch.nn.functional as F
 
 from data import FINAL_DATA
 from models import (
+    FASTTEXT_CRAWL_SUB_300D,
+    FASTTEXT_CRAWL_VEC_300D,
+    FASTTEXT_WIKI_SUB_300D,
+    FASTTEXT_WIKI_VEC_300D,
     GLOVE_6B_50D,
     GLOVE_6B_100D,
     GLOVE_6B_200D,
     GLOVE_6B_300D,
     GLOVE_42B_300D,
+    GLOVE_840B_300D,
+    GLOVE_TWITTER_27B_25D,
+    GLOVE_TWITTER_27B_50D,
+    GLOVE_TWITTER_27B_100D,
+    GLOVE_TWITTER_27B_200D,
+    WORD2VEC_GOOGLE_NEWS_300D,
 )
-
 
 fig_size = (15, 10)
 sns.set(
@@ -39,11 +49,21 @@ sns.set(
 
 
 embeddings = {
-    "GLOVE_6B_50D": (GLOVE_6B_50D, 50),
-    "GLOVE_6B_100D": (GLOVE_6B_100D, 100),
-    "GLOVE_6B_200D": (GLOVE_6B_200D, 200),
-    "GLOVE_6B_300D": (GLOVE_6B_300D, 300),
-    "GLOVE_42B_300D": (GLOVE_42B_300D, 300),
+    "GLOVE_6B_50D": (GLOVE_6B_50D, 50, "glove"),
+    "GLOVE_6B_100D": (GLOVE_6B_100D, 100, "glove"),
+    "GLOVE_6B_200D": (GLOVE_6B_200D, 200, "glove"),
+    "GLOVE_6B_300D": (GLOVE_6B_300D, 300, "glove"),
+    "GLOVE_42B_300D": (GLOVE_42B_300D, 300, "glove"),
+    "GLOVE_840B_300D": (GLOVE_840B_300D, 300, "glove"),
+    "GLOVE_TWITTER_27B_25D": (GLOVE_TWITTER_27B_25D, 25, "glove"),
+    "GLOVE_TWITTER_27B_50D": (GLOVE_TWITTER_27B_50D, 50, "glove"),
+    "GLOVE_TWITTER_27B_100D": (GLOVE_TWITTER_27B_100D, 100, "glove"),
+    "GLOVE_TWITTER_27B_200D": (GLOVE_TWITTER_27B_200D, 200, "glove"),
+    "WORD2VEC_GOOGLE_NEWS_300D": (WORD2VEC_GOOGLE_NEWS_300D, 300, "word2vec"),
+    "FASTTEXT_CRAWL_SUB": (FASTTEXT_CRAWL_SUB_300D, 300, "fasttext"),
+    "FASTTEXT_CRAWL_VEC_300D": (FASTTEXT_CRAWL_VEC_300D, 300, "fasttext"),
+    "FASTTEXT_WIKI_SUB_300D": (FASTTEXT_WIKI_SUB_300D, 300, "fasttext"),
+    "FASTTEXT_WIKI_VEC_300D": (FASTTEXT_WIKI_VEC_300D, 300, "fasttext"),
 }
 
 
@@ -107,23 +127,33 @@ class Logger:
         self.writer.add_text("Description", time_str)
 
 
-def _load_glove_model(File=None):
-    if File is None:
-        File, _ = embeddings.get("GLOVE_6B_300D")
-    print("Loading Glove Model")
-    gloveModel = {}
-    with open(File, "r", encoding="utf8") as f:
-        for line in f:
-            splitLines = line.split()
-            word = splitLines[0]
-            wordEmbedding = np.array([float(value) for value in splitLines[1:]])
-            gloveModel[word] = wordEmbedding
-    print(len(gloveModel), " words loaded!")
-    return gloveModel
+def _load_word_embedding_model(file=None, word_embedding_type="glove"):
+    model = {}
+    if file is None:
+        file, _ = embeddings.get("GLOVE_6B_300D")
+    print("Loading Model")
+    if word_embedding_type == "glove":
+        df = pd.read_csv(file, sep=" ", quoting=3, header=None, index_col=0)
+        model = {key: val.values for key, val in df.T.items()}
+        print(len(model), " words loaded!")
+    elif word_embedding_type == "word2vec":
+        model = KeyedVectors.load_word2vec_format(file, binary=True)
+    elif word_embedding_type == "fasttext":
+        model = KeyedVectors.load_word2vec_format(file, binary=False)
+    return model
 
 
 def _get_word_embeddings(word):
-    return WORD_EMBEDDINGS_MODEL.get(word, None)
+    word_embedding = None
+    try:
+        word_embedding = WORD_EMBEDDINGS_MODEL.get(word, None)
+    except AttributeError as e:
+        print(e)
+        try:
+            word_embedding = WORD_EMBEDDINGS_MODEL[word]
+        except Exception as e:
+            print(e)
+    return word_embedding
 
 
 def get_device():
@@ -150,7 +180,7 @@ def complex_df_to_tensor(_df):
         row = row.to_dict()
         g_em = []
         for key in row.keys():
-            if key != "GLOVE.6B":
+            if key != "word_embeddings":
                 temp_row.append(row[key])
             else:
                 g_em = Variable(torch.Tensor(row[key])).to(device)
@@ -163,8 +193,10 @@ def complex_df_to_tensor(_df):
 
 def data_loader(word):
     df = pd.read_csv(FINAL_DATA)
-    df["GLOVE.6B"] = df["actual_words"].apply(_get_word_embeddings)
-    x_data = df.loc[:, df.columns == "GLOVE.6B"]
+    df = df.drop(["GLOVE.6B"], axis=1, errors="ignore")
+    df["word_embeddings"] = df["actual_words"].apply(_get_word_embeddings)
+    df.dropna(inplace=True)
+    x_data = df.loc[:, df.columns == "word_embeddings"]
     y_data = df.loc[:, df.columns == word]
     y_data = df_to_tensor(y_data)
     x_data = complex_df_to_tensor(x_data)
@@ -287,7 +319,7 @@ def evaluate(model, x_data, y_data):
         "fpr": fpr,
         "tpr": tpr,
         "thresholds": thresholds,
-        "_auc": _auc,
+        "_auc": _auc_auc,
         "precision": precision,
         "recall": recall,
     }

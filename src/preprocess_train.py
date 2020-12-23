@@ -67,6 +67,7 @@ def validate_train_features():
         try:
             possible_word_features = df.loc[word].sum()
         except KeyError as e:
+            print(e)
             possible_word_features = 0
         hash_string = hash_data(word, actual_word_features, possible_word_features)
 

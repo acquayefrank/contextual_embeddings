@@ -12,22 +12,19 @@ class LogisticRegression(torch.nn.Module):
 
 
 class SingleLayeredNN(torch.nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_size: int, hidden_size: int, output_dim: int):
         super(SingleLayeredNN, self).__init__()
-        # Inputs to hidden layer linear transformation
-        self.hidden = torch.nn.Linear(input_dim, output_dim)
-        # Output layer, 10 units - one for each digit
-        self.output = torch.nn.Linear(input_dim, output_dim)
-
-        # Define sigmoid activation and softmax output
-        self.sigmoid = torch.nn.Sigmoid()
-        self.softmax = torch.nn.Softmax(dim=1)
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_dim = output_dim
+        self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
+        self.sigmoid1 = torch.nn.Sigmoid()
+        self.fc2 = torch.nn.Linear(self.hidden_size, self.output_dim)
+        self.sigmoid2 = torch.nn.Sigmoid()
 
     def forward(self, x):
-        # Pass the input tensor through each of our operations
-        x = self.hidden(x)
-        x = self.sigmoid(x)
-        x = self.output(x)
-        x = self.softmax(x)
-
-        return x
+        hidden = self.fc1(x)
+        sigmoid = self.sigmoid1(hidden)
+        output = self.fc2(sigmoid)
+        output = self.sigmoid2(output)
+        return output
