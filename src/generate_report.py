@@ -145,9 +145,9 @@ if __name__ == "__main__":
         "-f",
         "--file_path",
         type=str,
-        default=r"..\runs\Dec15_00-16-27_LAPTOP-TMI0A1R42020-12-15-987_epoch_num-5000_verbose-70_word-move_batch_size"
-        "-100_all-True_all_embeddings-True_all_models-True_learning_rate-0.0001_word_embeddings-GLOVE_6B_300D\events"
-        ".out.tfevents.1607980589.LAPTOP-TMI0A1R4.4084.0",
+        default=r"..\runs\Dec18_17-17-09_LAPTOP-TMI0A1R42020-12-18-62229_epoch_num-5000_verbose-70_word-move_batch_size"
+        "-100_all-True_all_embeddings-True_all_models-True_learning_rate-0.0001_word_embeddings-GLOVE_6B_300D"
+        "\events.out.tfevents.1608301031.LAPTOP-TMI0A1R4.7900.0",
         help="File Path to read even logs from",
     )
     args = parser.parse_args()

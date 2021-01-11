@@ -63,19 +63,19 @@ def main(script_args):
 
     if script_args.all_embeddings:
         word_embeddings = [
-            "GLOVE_6B_50D",
-            "GLOVE_6B_100D",
-            "GLOVE_6B_200D",
-            "GLOVE_6B_300D",
-            "GLOVE_42B_300D",
-            "GLOVE_840B_300D",
-            "GLOVE_TWITTER_27B_25D",
-            "GLOVE_TWITTER_27B_50D",
-            "GLOVE_TWITTER_27B_100D",
-            "GLOVE_TWITTER_27B_200D",
-            "WORD2VEC_GOOGLE_NEWS_300D",
-            "FASTTEXT_CRAWL_SUB",
-            "FASTTEXT_CRAWL_VEC_300D",
+            # "GLOVE_6B_50D",
+            # "GLOVE_6B_100D",
+            # "GLOVE_6B_200D",
+            # "GLOVE_6B_300D",
+            # "GLOVE_42B_300D",
+            # "GLOVE_840B_300D",
+            # "GLOVE_TWITTER_27B_25D",
+            # "GLOVE_TWITTER_27B_50D",
+            # "GLOVE_TWITTER_27B_100D",
+            # "GLOVE_TWITTER_27B_200D",
+            # "WORD2VEC_GOOGLE_NEWS_300D",
+            # "FASTTEXT_CRAWL_SUB",
+            # "FASTTEXT_CRAWL_VEC_300D",
             "FASTTEXT_WIKI_SUB_300D",
             "FASTTEXT_WIKI_VEC_300D",
         ]
@@ -190,7 +190,8 @@ def main(script_args):
                         epoch,
                     )
                 model_path = (
-                    TRAINED_MODELS_ROOT / f"{script_args.word}_{model_name}.pth"
+                    TRAINED_MODELS_ROOT
+                    / f"{script_args.word}_{word_embedding}_{model_name}.pth"
                 )
                 torch.save(model.state_dict(), model_path)
                 # Tests and Accuracies

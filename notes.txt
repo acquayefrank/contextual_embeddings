@@ -26,3 +26,64 @@ flak8 --- fix code
 vulture --- unused code
 coverage --- run tests
  
+TODO:
+    * Use common words from embeddins and repeat everything
+    * Intersection of words in word embeddings, delete words  that don't have enough hypernymns 
+    * Logistic Regresion --- saved 
+        For each word embedding heatmap of all words in logistic regression
+    * resart training on failure
+
+```python
+def save_train_features(_words, wwef_df):
+    print("saving")
+
+    def gen_features(word):
+        features = [data["word"] for data in word]
+        return features
+
+    @ray.remote
+    def process_final_data(args):
+        # write to work with chucks
+        word, c_row = args
+        print("processing final data")
+        _fwe_df = pd.DataFrame(
+            0,
+            index=np.arange(1, dtype=np.byte),
+            columns=sorted(list(all_features)),
+            dtype=np.byte,
+        )
+        _fwe_df.insert(loc=0, column="actual_words", value=word)
+        _fwe_df.set_index("actual_words", inplace=True)
+
+        for _index, _row in _fwe_df.iterrows():
+            for _data in c_row:
+                if _row.get(_data) is not None:
+                    _fwe_df.at[_index, _data] = 1
+        return _fwe_df.to_dict()
+
+    all_features = Parallel(n_jobs=num_cores)(
+        delayed(gen_features)(word) for _, word in _words.items()
+    )
+    final_features = []
+    for feature in all_features:
+        final_features += feature
+
+    all_features = set(final_features)
+
+    # with concurrent.futures.ThreadPoolExecutor() as e:
+    fut = [process_final_data.remote(index, row) for index, row in wwef_df.iterrows()]
+
+    r = ray.get(fut)
+
+    for cnt, result in enumerate(r):
+        with open(
+            f"{DATA_ROOT}/train_{datetime.datetime.now().strftime('%Y_%m')}.csv",
+            "a",
+            newline="",
+        ) as output_file:
+            # lines below may be too expensive, in such a case commented out lines should be used
+            if cnt == 0:
+                dict_writer = csv.DictWriter(output_file, result.keys())
+                dict_writer.writeheader()
+            dict_writer.writerows(result)
+```

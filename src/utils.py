@@ -130,7 +130,7 @@ class Logger:
 def _load_word_embedding_model(file=None, word_embedding_type="glove"):
     model = {}
     if file is None:
-        file, _ = embeddings.get("GLOVE_6B_300D")
+        file, *ign = embeddings.get("GLOVE_6B_300D")
     print("Loading Model")
     if word_embedding_type == "glove":
         df = pd.read_csv(file, sep=" ", quoting=3, header=None, index_col=0)
@@ -319,7 +319,7 @@ def evaluate(model, x_data, y_data):
         "fpr": fpr,
         "tpr": tpr,
         "thresholds": thresholds,
-        "_auc": _auc_auc,
+        "_auc": _auc,
         "precision": precision,
         "recall": recall,
     }
