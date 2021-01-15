@@ -1,3 +1,4 @@
+import argparse
 import csv
 import hashlib
 import json
@@ -143,8 +144,21 @@ def process_enriched_data(enriched_data):
     return final_data
 
 
-if __name__ == "__main__":
+def main(script_args):
     validate_train_features()
     clean_train = process_train_data()
     enriched_data = enrich_data(clean_train)
     process_enriched_data(enriched_data)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-ds",
+        "--data_source",
+        type=str,
+        default="embeddings",
+        help="The source of data to process, it's either `embeddings` or `common_words`",
+    )
+    script_args = parser.parse_args()
+    main(script_args)

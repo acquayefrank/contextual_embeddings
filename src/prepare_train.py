@@ -14,13 +14,13 @@ import aiohttp
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from numpy.core._multiarray_umath import ndarray
 
 from data import DATA_ROOT
 
 from .utils import _load_word_embedding_model, embeddings
 
-
-num_cores = multiprocessing.cpu_count()
+num_cores = multiprocessing.cpu_count() - 1
 
 
 def get_words_from_embeddings():
@@ -130,7 +130,7 @@ def get_words_with_extracted_features(words, max_length):
 
 def save_train_features(words_with_extracted_features_path, words, temp_file_path):
     print("make sure temp_train folder is empty before proceding")
-    wwef_df = pd.read_csv(words_with_extracted_features_path)
+    wwef_df = pd.read_csv(words_with_extracted_features_path, index_col=0)
 
     def gen_features(word):
         features = [data["word"] for data in word]
@@ -139,9 +139,7 @@ def save_train_features(words_with_extracted_features_path, words, temp_file_pat
     all_features = Parallel(n_jobs=num_cores)(
         delayed(gen_features)(word) for _, word in words.items()
     )
-    final_features = []
-    for feature in all_features:
-        final_features += feature
+    final_features = [value for feature in all_features for value in feature]
 
     all_features = set(final_features)
 
@@ -168,7 +166,7 @@ def save_train_features(words_with_extracted_features_path, words, temp_file_pat
         return _file_name
 
     file_names = []
-    chunks = np.array_split(wwef_df, 1000)
+    chunks = np.array_split(wwef_df, 1000000)
     for cnt, chunk in enumerate(chunks):
         file_name = Parallel(n_jobs=num_cores)(
             delayed(process_final_data)((index, row)) for index, row in chunk.iterrows()
@@ -181,19 +179,25 @@ def save_train_features(words_with_extracted_features_path, words, temp_file_pat
 
 
 def main(script_args):
-    def save_final_train(feature_file_path, cnt, total_paths):
+    def save_final_train(feature_file_path, cnt, total_paths, _file_name):
         paths_left = total_paths - (cnt + 1)
         print(
             f"current path number being processed: {cnt}, paths left to process: {paths_left}"
         )
-        _file_name = f"{DATA_ROOT}/{script_args.data_source}_train.csv"
+
         df = pd.read_csv(feature_file_path)
-        if cnt == 0:
-            df.to_csv(_file_name)
-        else:
-            df.to_csv(
-                _file_name, mode="a", header=False,
-            )
+        df = df.loc[(df.sum(axis=1) != 0)]
+        print(df)
+        if not df.empty:
+            if not Path(_file_name).is_file():
+                df.to_csv(_file_name)
+            else:
+                df.to_csv(
+                    _file_name, mode="a", header=False,
+                )
+
+            with open(processed_temp_file_path, "a+",) as f:
+                f.write("%s\n" % feature_file_path)
 
     file_name = ""
     if script_args.data_source == "embeddings":
@@ -251,13 +255,22 @@ def main(script_args):
     temp_file_path = f"{DATA_ROOT}/temp_train_{script_args.data_source}_{datetime.datetime.now().strftime('%Y_%m')}.txt"
     if not Path(temp_file_path).is_file():
         save_train_features(words_with_extracted_features_path, words, temp_file_path)
-    paths = np.loadtxt(temp_file_path, delimiter=",", dtype="str")
+
+    paths_to_keep: ndarray = np.loadtxt(temp_file_path, delimiter=",", dtype="str")
+    _file_name = f"{DATA_ROOT}/{script_args.data_source}_train.csv"
+    processed_temp_file_path = f"{DATA_ROOT}/processed_temp_train.txt"
+    try:
+        paths_to_remove = np.loadtxt(
+            processed_temp_file_path, delimiter=",", dtype="str"
+        )
+    except OSError:
+        paths_to_remove = []
+    paths = set(list(paths_to_keep) + list(paths_to_remove))
 
     _ = Parallel(n_jobs=num_cores)(
-        delayed(save_final_train)(path, index, len(paths))
+        delayed(save_final_train)(path, index, len(paths), _file_name)
         for index, path in enumerate(paths)
     )
-    save_final_train(paths[0], 0)
 
 
 if __name__ == "__main__":
