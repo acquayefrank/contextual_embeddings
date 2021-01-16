@@ -3,37 +3,21 @@ import csv
 import hashlib
 import json
 from pathlib import Path
+import multiprocessing
 
 import numpy as np
 import pandas as pd
 import spacy
 from nltk import pos_tag
+from joblib import Parallel, delayed
 
 from data import DATA_ROOT as DATA_PATH
-from data import TRAIN_DATA_PATH, WORDS_DATA_PATH
+from data import WORDS_DATA_PATH, WORDS_FROM_EMBEDDINGS_DATA_PATH
 from evaluation import EVALUATION_ROOT as EVALUATION_PATH
-from models import GLOVE_6B_50D
 
-df = pd.read_csv(TRAIN_DATA_PATH, index_col="actual_words")
+
 nlp = spacy.load("en_core_web_sm")
-
-
-def _load_glove_model(File=GLOVE_6B_50D):
-    print("Loading Glove Model")
-    gloveModel = {}
-    with open(File, "r", encoding="utf8") as f:
-        for line in f:
-            splitLines = line.split()
-            word = splitLines[0]
-            wordEmbedding = np.array(
-                [float(value) for value in splitLines[1:]]
-            ).tolist()
-            gloveModel[word] = wordEmbedding
-    print(len(gloveModel), " words loaded!")
-    return gloveModel
-
-
-GLOVE_MODEL = _load_glove_model()
+num_cores = multiprocessing.cpu_count() - 1
 
 
 def hash_data(word, actual_word_features, possible_word_features):
@@ -42,31 +26,19 @@ def hash_data(word, actual_word_features, possible_word_features):
     ).hexdigest()
 
 
-def validate_train_features():
+def validate_train_features(data_source, df):
+    def iterate_over_words(word, cnt):
+        words_left = len(df["actual_words"].tolist()) - cnt
+        print(f"current iteration: {cnt}, words left: {words_left}")
+        try:
+            actual_word_features = len(words[word])
+        except KeyError as e:
+            print(e, "keyerror")
+            actual_word_features = 0
 
-    words = {}
-    headers = ["Word", "Expected Features", "Actual Features"]
-    possible_errors_file = Path(DATA_PATH / "possible_errors.csv")
-    processed_words_file = Path(DATA_PATH / "processed_words.txt")
-
-    if not possible_errors_file.is_file():
-        with open(possible_errors_file, "a+") as file:
-            wr = csv.writer(file, dialect="excel")
-            wr.writerow(headers)
-
-    with open(WORDS_DATA_PATH) as file:
-        reader = file.readlines()
-        words = json.loads(reader[0])
-
-    processed_words = []
-    with open(processed_words_file, "a+") as file:
-        processed_words = file.readlines()
-
-    possible_errors = []
-    for word in words:
-        actual_word_features = len(words[word])
         try:
             possible_word_features = df.loc[word].sum()
+            print(f"possible word features {possible_word_features}")
         except KeyError as e:
             print(e)
             possible_word_features = 0
@@ -87,30 +59,69 @@ def validate_train_features():
 
             print(word, actual_word_features, possible_word_features)
 
+    words_path = {
+        "embeddings": WORDS_FROM_EMBEDDINGS_DATA_PATH,
+        "common_words": WORDS_DATA_PATH,
+    }
+    words = {}
+    headers = ["Word", "Expected Features", "Actual Features"]
+    possible_errors_file = Path(f"{DATA_PATH}/{data_source}_possible_errors.csv")
+    processed_words_file = Path(f"{DATA_PATH}/{data_source}_processed_words.txt")
 
-def process_train_data(threshold=100):
+    if not possible_errors_file.is_file():
+        with open(possible_errors_file, "a+") as file:
+            wr = csv.writer(file, dialect="excel")
+            wr.writerow(headers)
 
+    with open(words_path.get(data_source)) as file:
+        reader = file.readlines()
+        words = json.loads(reader[0])
+
+    processed_words = []
+    with open(processed_words_file, "w+") as file:
+        processed_words = file.readlines()
+
+    possible_errors = []
+
+    _ = Parallel(n_jobs=num_cores)(
+        delayed(iterate_over_words)(word, cnt)
+        for cnt, word in enumerate(df["actual_words"].tolist())
+    )
+
+
+def process_train_data(df, data_source, threshold=10):
+    df = df.set_index("actual_words")
+    df = df.apply(pd.to_numeric)
     # remove columns below threshold
     df_with_threshold = df.loc[:, (df.sum(axis=0) >= threshold)].copy()
-
+    print(f"current threshold: {threshold}")
+    print(list(df_with_threshold))
+    if df_with_threshold.empty:
+        print(f"Data frame is empty for threshold: {threshold}")
+        exit()
     # create sum of rows
     df_with_threshold["_sum_of_features"] = df_with_threshold.sum(axis=1)
 
-    # drop words with no features
+    # drop words with no features or fishy number of features
+    max_features = len(list(df)) - 3
     df_with_threshold.drop(
-        df_with_threshold[df_with_threshold._sum_of_features <= 0].index, inplace=True
+        df_with_threshold[
+            (df_with_threshold._sum_of_features <= 0)
+            | (df_with_threshold._sum_of_features >= max_features)
+        ].index,
+        inplace=True,
     )
     del df_with_threshold["_sum_of_features"]
 
     feature_metrics = df_with_threshold.sum(axis=0, skipna=True)
     feature_metrics[1:].sort_values(ascending=False).to_csv(
-        f"{EVALUATION_PATH}/feature_metrics.csv",
+        f"{EVALUATION_PATH}/{data_source}_{threshold}_feature_metrics.csv",
         header=["count_of_words_having_this_feature"],
     )
 
-    df_with_threshold.to_csv(f"{DATA_PATH}/clean_train.csv")
+    df_with_threshold.to_csv(f"{DATA_PATH}/{data_source}_{threshold}_clean_train.csv")
 
-    return f"{DATA_PATH}/clean_train.csv"
+    return f"{DATA_PATH}/{data_source}_{threshold}_clean_train.csv"
 
 
 def _get_pos(word, is_spacy=True):
@@ -119,24 +130,19 @@ def _get_pos(word, is_spacy=True):
     return pos_tag([word])[0][1]
 
 
-def _get_word_embeddings(word):
-    return GLOVE_MODEL.get(word, None)
-
-
-def enrich_data(clean_train):
-    enriched_data = f"{DATA_PATH}/enriched_data.csv"
+def enrich_data(clean_train, data_source):
+    threshold = clean_train.split("_")[-3]
+    enriched_data = f"{DATA_PATH}/{data_source}_{threshold}_enriched_data.csv"
     c_df = pd.read_csv(clean_train)
     c_df["POS_TAG"] = c_df["actual_words"].apply(_get_pos)
-    c_df["GLOVE.6B"] = c_df["actual_words"].apply(_get_word_embeddings)
     c_df.to_csv(enriched_data, index=False)
     return enriched_data
 
 
-def process_enriched_data(enriched_data):
-    final_data = f"{DATA_PATH}/final_data.csv"
+def process_enriched_data(enriched_data, data_source):
+    threshold = enriched_data.split("_")[-3]
+    final_data = f"{DATA_PATH}/{data_source}_{threshold}_final_data.csv"
     e_df = pd.read_csv(enriched_data)
-    e_df["GLOVE.6B"].replace("", np.nan, inplace=True)
-    e_df.dropna(subset=["GLOVE.6B"], inplace=True)
     dummy = pd.get_dummies(e_df["POS_TAG"], prefix="POS_TAG", drop_first=True)
     del e_df["POS_TAG"]
     e_df = pd.concat([e_df, dummy], axis=1)
@@ -145,10 +151,27 @@ def process_enriched_data(enriched_data):
 
 
 def main(script_args):
-    validate_train_features()
-    clean_train = process_train_data()
-    enriched_data = enrich_data(clean_train)
-    process_enriched_data(enriched_data)
+    print(script_args.data_source)
+    df = None
+    if script_args.data_source == "embeddings":
+        df = pd.read_csv(f"{DATA_PATH}/{script_args.data_source}_train.csv")
+    elif script_args.data_source == "common_words":
+        df = pd.read_csv(f"{DATA_PATH}/train.csv")
+    df.set_index("actual_words", drop=False, inplace=True)
+    df.drop(
+        df[
+            (df.actual_words.astype(str).str.isdecimal())
+            | (df.actual_words.astype(str).str.isnumeric())
+            | (df.actual_words.astype(str).str.isdigit())
+        ].index,
+        inplace=True,
+    )
+    df = df.apply(pd.to_numeric, errors="ignore")
+    # validate_train_features(script_args.data_source, df) # seems redundant and perhaps may have an issue.
+    for x in range(5, 100):
+        clean_train = process_train_data(df, script_args.data_source, threshold=x)
+        enriched_data = enrich_data(clean_train, script_args.data_source)
+        process_enriched_data(enriched_data, script_args.data_source)
 
 
 if __name__ == "__main__":
