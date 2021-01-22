@@ -5,11 +5,11 @@ import json
 from pathlib import Path
 import multiprocessing
 
-import numpy as np
 import pandas as pd
 import spacy
 from nltk import pos_tag
 from joblib import Parallel, delayed
+import dask.dataframe as dd
 
 from data import DATA_ROOT as DATA_PATH
 from data import WORDS_DATA_PATH, WORDS_FROM_EMBEDDINGS_DATA_PATH
@@ -90,17 +90,21 @@ def validate_train_features(data_source, df):
 
 
 def process_train_data(df, data_source, threshold=10):
-    df = df.set_index("actual_words")
-    df = df.apply(pd.to_numeric)
+    print("called process_train_data")
     # remove columns below threshold
-    df_with_threshold = df.loc[:, (df.sum(axis=0) >= threshold)].copy()
+    # df_with_threshold = df.loc[:, (df.sum(axis=0) >= threshold)].copy()
+    df_with_threshold = df.loc[
+        :, (df.iloc[:, 1:].sum(axis=0).compute() >= threshold)
+    ].copy()
     print(f"current threshold: {threshold}")
     print(list(df_with_threshold))
     if df_with_threshold.empty:
         print(f"Data frame is empty for threshold: {threshold}")
         exit()
     # create sum of rows
-    df_with_threshold["_sum_of_features"] = df_with_threshold.sum(axis=1)
+    df_with_threshold["_sum_of_features"] = (
+        df_with_threshold.iloc[:, 1:].sum(axis=1).compute()
+    )
 
     # drop words with no features or fishy number of features
     max_features = len(list(df)) - 3
@@ -153,25 +157,22 @@ def process_enriched_data(enriched_data, data_source):
 def main(script_args):
     print(script_args.data_source)
     df = None
+    print("reading file(s)")
     if script_args.data_source == "embeddings":
-        df = pd.read_csv(f"{DATA_PATH}/{script_args.data_source}_train.csv")
+        df = dd.read_csv(f"{DATA_PATH}/temp_train/*.csv", assume_missing=True)
     elif script_args.data_source == "common_words":
         df = pd.read_csv(f"{DATA_PATH}/train.csv")
-    df.set_index("actual_words", drop=False, inplace=True)
-    df.drop(
-        df[
-            (df.actual_words.astype(str).str.isdecimal())
-            | (df.actual_words.astype(str).str.isnumeric())
-            | (df.actual_words.astype(str).str.isdigit())
-        ].index,
-        inplace=True,
-    )
-    df = df.apply(pd.to_numeric, errors="ignore")
+    print("setting index")
+    # df = df.set_index("actual_words")
+    print("done setting index")
+    # print(df)
+    print("was expensive")
+
     # validate_train_features(script_args.data_source, df) # seems redundant and perhaps may have an issue.
-    for x in range(5, 100):
-        clean_train = process_train_data(df, script_args.data_source, threshold=x)
-        enriched_data = enrich_data(clean_train, script_args.data_source)
-        process_enriched_data(enriched_data, script_args.data_source)
+    # for x in range(5, 100):
+    clean_train = process_train_data(df, script_args.data_source, threshold=100)
+    enriched_data = enrich_data(clean_train, script_args.data_source)
+    process_enriched_data(enriched_data, script_args.data_source)
 
 
 if __name__ == "__main__":
