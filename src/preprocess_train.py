@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import multiprocessing
+import glob, os
 
 import pandas as pd
 import spacy
@@ -158,10 +159,11 @@ def main(script_args):
     print(script_args.data_source)
     df = None
     print("reading file(s)")
-    if script_args.data_source == "embeddings":
-        df = dd.read_csv(f"{DATA_PATH}/temp_train/*.csv", assume_missing=True)
-    elif script_args.data_source == "common_words":
-        df = pd.read_csv(f"{DATA_PATH}/train.csv")
+    df = pd.concat(
+        map(pd.read_csv, glob.glob(os.path.join("", f"{DATA_PATH}/temp_train/*.csv")))
+    )
+    print(df.head())
+    exit()
     print("setting index")
     # df = df.set_index("actual_words")
     print("done setting index")

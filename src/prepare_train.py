@@ -24,8 +24,8 @@ num_cores = multiprocessing.cpu_count() - 1
 
 
 def get_words_from_embeddings():
+    min_number_of_words_in_all_embeddings = 0
     unprocessed_words = []
-    _words: Set[str] = set()
 
     for index, embedding in enumerate(embeddings):
         print(embedding, " :being processed ", index, " :embedding count")
@@ -35,13 +35,21 @@ def get_words_from_embeddings():
         )
 
         if word_embedding_type in ["word2vec", "fasttext"]:
-            unprocessed_words.append(list(model.vocab.keys()))
+            keys = set(str(key).lower() for key in model.vocab.keys())
         elif word_embedding_type == "glove":
-            unprocessed_words.append(list(model.keys()))
+            keys = set(str(key).lower() for key in model.keys())
+        else:
+            keys = set()
 
-    for word in unprocessed_words:
-        _words.add(str(word).lower())
+        if len(keys) > min_number_of_words_in_all_embeddings:
+            min_number_of_words_in_all_embeddings = len(keys)
+        unprocessed_words.append(keys)
 
+    _words = set.intersection(*unprocessed_words)
+
+    print(
+        f"The minimum number of words in word embeddings is: {min_number_of_words_in_all_embeddings}"
+    )
     return list(_words)
 
 
@@ -179,26 +187,6 @@ def save_train_features(words_with_extracted_features_path, words, temp_file_pat
 
 
 def main(script_args):
-    def save_final_train(feature_file_path, cnt, total_paths, _file_name):
-        paths_left = total_paths - (cnt + 1)
-        print(
-            f"current path number being processed: {cnt}, paths left to process: {paths_left}"
-        )
-
-        df = pd.read_csv(feature_file_path)
-        df = df.loc[(df.sum(axis=1) != 0)]
-        print(df)
-        if not df.empty:
-            if not Path(_file_name).is_file():
-                df.to_csv(_file_name)
-            else:
-                df.to_csv(
-                    _file_name, mode="a", header=False,
-                )
-
-            with open(processed_temp_file_path, "a+",) as f:
-                f.write("%s\n" % feature_file_path)
-
     file_name = ""
     if script_args.data_source == "embeddings":
 
@@ -224,6 +212,11 @@ def main(script_args):
             with open(words_from_embeddings, "r", encoding="utf-8") as f:
                 reader = csv.reader(f, quoting=csv.QUOTE_NONE)
                 words = list(reader)
+        words = words[0]
+        assert (
+            len(words)
+            <= 2_702_150  # number is hard coded since The minimum number of words in all word embeddings is 2_702_150
+        ), "The minimum number of words in all word embeddings is 2_702_150 hence intersection should be less"
         words = re.findall(r"'(\w+)'", str(words))
         file_name = f"{DATA_ROOT}/_words_from_word_embeddings_with_hyponyms.txt"
         if not Path(file_name).is_file():
@@ -231,6 +224,9 @@ def main(script_args):
             save_words_with_hyponyms(
                 words_with_hyponyms, "_words_from_word_embeddings_with_hyponyms.txt"
             )
+
+        print(len(words))
+        exit()
 
     elif script_args.data_source == "common_words":
 
@@ -241,6 +237,7 @@ def main(script_args):
         if not Path(file_name).is_file():
             words_with_hyponyms = get_words_with_hyponyms(content)
             save_words_with_hyponyms(words_with_hyponyms, "_words_with_hyponyms.txt")
+
     words_with_extracted_features_path = (
         f"{DATA_ROOT}/words_with_extracted_features_{script_args.data_source}.csv"
     )
@@ -252,25 +249,10 @@ def main(script_args):
         )
         wwef_df = pd.DataFrame.from_dict(words_with_extracted_features, orient="index")
         wwef_df.to_csv(words_with_extracted_features_path)
+
     temp_file_path = f"{DATA_ROOT}/temp_train_{script_args.data_source}_{datetime.datetime.now().strftime('%Y_%m')}.txt"
     if not Path(temp_file_path).is_file():
         save_train_features(words_with_extracted_features_path, words, temp_file_path)
-
-    paths_to_keep: ndarray = np.loadtxt(temp_file_path, delimiter=",", dtype="str")
-    _file_name = f"{DATA_ROOT}/{script_args.data_source}_train.csv"
-    processed_temp_file_path = f"{DATA_ROOT}/processed_temp_train.txt"
-    try:
-        paths_to_remove = np.loadtxt(
-            processed_temp_file_path, delimiter=",", dtype="str"
-        )
-    except OSError:
-        paths_to_remove = []
-    paths = set(list(paths_to_keep) + list(paths_to_remove))
-
-    _ = Parallel(n_jobs=num_cores)(
-        delayed(save_final_train)(path, index, len(paths), _file_name)
-        for index, path in enumerate(paths)
-    )
 
 
 if __name__ == "__main__":

@@ -36,6 +36,13 @@ TODO:
 
 
 
-Use Intersection not union
+Use Intersection not union ---
+    Done minimum number of words = 2_702_150
+    Words found in intersection = 137_245
+    Words processed 136884 in 228.0505609512329 seconds
+    Saved Words = 83081
 Reorder rows to be dendogrum or heirachical cluster
 Change numbers to names of words
+
+
+Save all common words 
