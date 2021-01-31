@@ -426,8 +426,13 @@ TSWLatexianTemp*
 
 models/
 
-!data/.gitignore
-!models/.gitignore
+!data/.gitkeep
+!data/README.md
+!data/__init__.py
+
+!models/.gitkeep
+!models/__init__.py
+!models/README.md
 
 runs/
 .idea/
