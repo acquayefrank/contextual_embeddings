@@ -433,3 +433,6 @@ runs/
 .idea/
 logs/*
 !logs/__init__.py
+!runs/.gitkeep
+evaluation/
+!evaluation/.gitkeep

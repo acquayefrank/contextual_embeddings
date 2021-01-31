@@ -35,8 +35,8 @@ TODO:
 
 
 -------------------------------------------------------------------------------------
-How many common words are missing per word embedding
-How many common words are in intersection of word embeddings
+* How many common words are missing per word embedding
+* How many common words are in intersection of word embeddings
 Generate reports
 Generate dendograms and heatmaps 
 Merge other code

@@ -18,8 +18,9 @@ from data import DATA_ROOT as DATA_PATH
 
 from .utils import _load_word_embedding_model, embeddings, get_logger, generate_uuid
 
+UUID = generate_uuid()
 num_cores = multiprocessing.cpu_count() - 1
-logger = get_logger()
+logger = get_logger(run_id=UUID)
 
 
 def get_words_from_embeddings(_logger=None):
@@ -176,7 +177,7 @@ def save_words_with_hyponyms(_words, file_name):
     return True
 
 
-def main(script_args, _logger=None, run_id=None):
+def main(script_args, _logger=None):
     """Main function that prepares train data.
 
     This function calls other functions and generates train data for examining distributed word embeddings
@@ -188,7 +189,6 @@ def main(script_args, _logger=None, run_id=None):
     Args:
         script_args: argparse variables obtained at the time of running script
         _logger: A python logger object for logging run data
-        run_id: A uuid4 identifier for tagging runs
 
     Returns:
         function returns nothings hence returns implicit None
@@ -196,8 +196,8 @@ def main(script_args, _logger=None, run_id=None):
     if not _logger:
         _logger = logger
 
-    if not run_id:
-        run_id = generate_uuid()
+    if not script_args.run_id:
+        script_args.run_id = UUID
 
     file_name = ""  # declared to ensure file_name is always set
 
@@ -219,7 +219,9 @@ def main(script_args, _logger=None, run_id=None):
             except OverflowError:
                 max_int = int(max_int / 10)
 
-        words_from_embeddings = f"{DATA_PATH}/words_from_embeddings.csv"
+        words_from_embeddings = (
+            f"{DATA_PATH}/{script_args.run_id}_words_from_embeddings.csv"
+        )
         if not Path(words_from_embeddings).is_file():
             words = get_words_from_embeddings(_logger)
             with open(words_from_embeddings, "w", encoding="utf-8") as result_file:
@@ -238,11 +240,12 @@ def main(script_args, _logger=None, run_id=None):
             <= 400_000  # number is hard coded since The minimum number of words in all word embeddings is 400_000
         ), "The minimum number of words in all word embeddings is 400_000 hence intersection should be less"
         words = re.findall(r"'(\w+)'", str(words))
-        file_name = f"{DATA_PATH}/_words_from_word_embeddings_with_hyponyms.txt"
+        file_name = f"{DATA_PATH}/{script_args.run_id}_words_from_word_embeddings_with_hyponyms.txt"
         if not Path(file_name).is_file():
             words_with_hyponyms = get_words_with_hyponyms(words)
             save_words_with_hyponyms(
-                words_with_hyponyms, "_words_from_word_embeddings_with_hyponyms.txt"
+                words_with_hyponyms,
+                f"{script_args.run_id}_words_from_word_embeddings_with_hyponyms.txt",
             )
 
     elif script_args.data_source == "common_words":
@@ -250,10 +253,12 @@ def main(script_args, _logger=None, run_id=None):
         with open(f"{DATA_PATH}/corncob_lowercase.txt", "r") as reader:
             content = reader.readlines()
             content = [line.strip() for line in content]
-        file_name = f"{DATA_PATH}/_words_with_hyponyms.txt"
+        file_name = f"{DATA_PATH}/{script_args.run_id}_words_with_hyponyms.txt"
         if not Path(file_name).is_file():
             words_with_hyponyms = get_words_with_hyponyms(content)
-            save_words_with_hyponyms(words_with_hyponyms, "_words_with_hyponyms.txt")
+            save_words_with_hyponyms(
+                words_with_hyponyms, f"{script_args.run_id}_words_with_hyponyms.txt"
+            )
 
     with open(file_name, "r") as reader:
         words = reader.readlines()
@@ -287,7 +292,7 @@ def main(script_args, _logger=None, run_id=None):
 
     _logger.info(f"Total number of hyponyms i.e unique hyponyms is {len(all_features)}")
 
-    tmp_file = f"{DATA_PATH}/{script_args.data_source}_words.csv"
+    tmp_file = f"{DATA_PATH}/{script_args.run_id}_{script_args.data_source}_words.csv"
     with open(tmp_file, "w", encoding="utf-8") as f:
         writer = csv.writer(f, lineterminator="\n")
         for tup in final_words:
@@ -308,10 +313,9 @@ def main(script_args, _logger=None, run_id=None):
             if row.get(data[1]) is not None:
                 fwe_df.at[index, data[1]] = 1
 
-    if script_args.data_source == "embeddings":
-        fwe_df.to_csv(f"{DATA_PATH}/word_{script_args.data_source}_train.csv")
-    else:
-        fwe_df.to_csv(f"{DATA_PATH}/train.csv")
+    fwe_df.to_csv(
+        f"{DATA_PATH}/{script_args.run_id}_word_{script_args.data_source}_train.csv"
+    )
     shape = fwe_df.shape
     _logger.info(
         f"Total number of words and hyponyms is {shape}, \
@@ -328,6 +332,15 @@ if __name__ == "__main__":
         type=str,
         default="embeddings",
         help="The source of data to process, it's either `embeddings` or `common_words`",
+    )
+    parser.add_argument(
+        "-id",
+        "--run_id",
+        type=str,
+        default=None,
+        help="Provide a unique identifier which would be used to track the running of the experiment,\
+             in the case where it's not provided one will be generated for you. \
+             In order to continue the experiment from when it failed,provide it's unique identifier",
     )
     args: Namespace = parser.parse_args()
     main(args)

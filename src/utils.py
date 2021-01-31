@@ -342,7 +342,7 @@ def get_words(threshold=100):
 ####################################################### End all words ##########################################################
 
 
-def get_logger():
+def get_logger(run_id=None):
     """Returns a generic logger for logging relevant information pertaining to run
 
     Returns:
@@ -352,10 +352,13 @@ def get_logger():
     logger = logging.getLogger("ce_application")
     logger.setLevel(logging.DEBUG)
 
+    if not run_id:
+        run_id = generate_uuid()
+
     if not logger.handlers:
         # create file handler which logs even debug messages
         fh = logging.FileHandler(
-            f"{LOG_PATH}/log_{datetime.datetime.now().strftime('%y_%m_%d_%H_%M_%S')}.log"
+            f"{LOG_PATH}/{run_id}_log_{datetime.datetime.now().strftime('%y_%m_%d_%H_%M_%S')}.log"
         )
         fh.setLevel(logging.DEBUG)
 
