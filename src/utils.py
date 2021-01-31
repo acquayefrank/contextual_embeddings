@@ -1,4 +1,8 @@
+import sys
 import datetime
+import logging
+import uuid
+import base64
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +21,7 @@ from sklearn.metrics import (
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 
-from data import FINAL_DATA
+from data import COMMON_WORDS_FINAL_DATA
 from models import (
     FASTTEXT_CRAWL_SUB_300D,
     FASTTEXT_CRAWL_VEC_300D,
@@ -35,6 +39,7 @@ from models import (
     GLOVE_TWITTER_27B_200D,
     WORD2VEC_GOOGLE_NEWS_300D,
 )
+from .logs import LOGS_ROOT as LOG_PATH
 
 fig_size = (15, 10)
 sns.set(
@@ -191,8 +196,8 @@ def complex_df_to_tensor(_df):
     return torch.stack(temp_x, 0)
 
 
-def data_loader(word):
-    df = pd.read_csv(FINAL_DATA)
+def data_loader(word, data_source=None):
+    df = pd.read_csv(COMMON_WORDS_FINAL_DATA)
     df = df.drop(["GLOVE.6B"], axis=1, errors="ignore")
     df["word_embeddings"] = df["actual_words"].apply(_get_word_embeddings)
     df.dropna(inplace=True)
@@ -206,9 +211,9 @@ def data_loader(word):
 class DatasetLoader(torch.utils.data.Dataset):
     "Characterizes a dataset for PyTorch"
 
-    def __init__(self, word, selected_partition):
+    def __init__(self, word, selected_partition, data_source=None):
         "Initialization"
-        x_data, y_data, indexes = data_loader(word)
+        x_data, y_data, indexes = data_loader(word, data_source)
 
         # Datasets
         partition = {"train": indexes, "validation": indexes}
@@ -327,7 +332,7 @@ def evaluate(model, x_data, y_data):
 
 ####################################################### Get all words ##########################################################
 def get_words(threshold=100):
-    df = pd.read_csv(FINAL_DATA)
+    df = pd.read_csv(COMMON_WORDS_FINAL_DATA)
     subset = df[df.columns.difference(["actual_words", "GLOVE.6B"])]
     # remove columns below threshold
     df_with_threshold = subset.loc[:, (subset.sum(axis=0) >= threshold)].copy()
@@ -335,3 +340,47 @@ def get_words(threshold=100):
 
 
 ####################################################### End all words ##########################################################
+
+
+def get_logger():
+    """Returns a generic logger for logging relevant information pertaining to run
+
+    Returns:
+        Python logger object
+    """
+    # create logger with 'spam_application'
+    logger = logging.getLogger("ce_application")
+    logger.setLevel(logging.DEBUG)
+
+    if not logger.handlers:
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(
+            f"{LOG_PATH}/log_{datetime.datetime.now().strftime('%y_%m_%d_%H_%M_%S')}.log"
+        )
+        fh.setLevel(logging.DEBUG)
+
+        # create console handler with a higher log level
+        ch = logging.StreamHandler(stream=sys.stdout)
+        ch.setLevel(logging.DEBUG)
+
+        # create formatter and add it to the handlers
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
+
+        # add the handlers to the logger
+        logger.addHandler(fh)
+        logger.addHandler(ch)
+
+    return logger
+
+
+def generate_uuid():
+    """Generates a uuid 4 string, in this context for tracking each run of the experiment
+
+    Returns:
+        an ascii friendly uuid4 string.
+    """
+    return base64.urlsafe_b64encode(uuid.uuid4().bytes).rstrip(b"=").decode("ascii")

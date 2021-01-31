@@ -34,7 +34,13 @@ TODO:
     * resart training on failure
 
 
-
+-------------------------------------------------------------------------------------
+How many common words are missing per word embedding
+How many common words are in intersection of word embeddings
+Generate reports
+Generate dendograms and heatmaps 
+Merge other code
+-------------------------------------------------------------------------------------
 
 Use Intersection not union ---
     Done minimum number of words = 2_702_150

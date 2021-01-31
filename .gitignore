@@ -431,3 +431,5 @@ models/
 
 runs/
 .idea/
+logs/*
+!logs/__init__.py

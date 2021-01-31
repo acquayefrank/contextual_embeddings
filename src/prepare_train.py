@@ -1,30 +1,43 @@
+import time
 import argparse
 import asyncio
 import csv
-import datetime
 import json
 import multiprocessing
 import re
 import sys
 import time
+from argparse import Namespace
 from pathlib import Path
-from typing import Set
 
 import aiohttp
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
-from numpy.core._multiarray_umath import ndarray
 
-from data import DATA_ROOT
+from data import DATA_ROOT as DATA_PATH
 
-from .utils import _load_word_embedding_model, embeddings
+from .utils import _load_word_embedding_model, embeddings, get_logger, generate_uuid
 
 num_cores = multiprocessing.cpu_count() - 1
+logger = get_logger()
 
 
-def get_words_from_embeddings():
+def get_words_from_embeddings(_logger=None):
+    """Gets an intersection of words from all word embeddings available.
+
+    This method reads in all word embeddings on the system and finds an intersection of common words.
+    
+    Args:
+        _logger: Expects a _logger object to be passed
+
+    Returns:
+        An intersected list of words from all word embeddings
+    """
+    if not _logger:
+        _logger = logger
+
     min_number_of_words_in_all_embeddings = 0
+    word_emb = ""
     unprocessed_words = []
 
     for index, embedding in enumerate(embeddings):
@@ -41,20 +54,53 @@ def get_words_from_embeddings():
         else:
             keys = set()
 
-        if len(keys) > min_number_of_words_in_all_embeddings:
+        if index == 0:
             min_number_of_words_in_all_embeddings = len(keys)
+            word_emb = embedding
+            print(
+                f"Current minimum number of words in word embeddings is: {min_number_of_words_in_all_embeddings}",
+                f"Current word embedding that has the minimum number of words is {word_emb}",
+            )
+
+        if len(keys) < min_number_of_words_in_all_embeddings:
+            min_number_of_words_in_all_embeddings = len(keys)
+            word_emb = embedding
+            print(
+                f"Current minimum number of words in word embeddings is: {min_number_of_words_in_all_embeddings}",
+                f"Current word embedding that has the minimum number of words is {word_emb}",
+            )
         unprocessed_words.append(keys)
 
     _words = set.intersection(*unprocessed_words)
-
-    print(
-        f"The minimum number of words in word embeddings is: {min_number_of_words_in_all_embeddings}"
+    _logger.info(
+        f"The minimum number of words in word embeddings is: {min_number_of_words_in_all_embeddings} \n \
+        The word embedding that has the minimum number of words is {word_emb}"
     )
+
     return list(_words)
 
 
 def get_words_with_hyponyms(_words):
-    print("called get words with hyponyms")
+    """Fetches hyponyms of words.
+
+    This method makes consecutive calls to an API and returns the list of hyponyms associated with a word.
+
+    Typical usage exampl:
+        words_with hyponyms = get_words_with_hyponyms(words)
+
+    Args:
+        _words = A list of words whose hyponyms are to be returned
+
+    Returns:
+        words_with hyponyms: A dictionary of words with their related hyponyms
+
+    Raises:
+        Network Error, All sort of funky stuff. This method does a lot.
+    """
+
+    print(
+        f"About to start making api calls for hyponyms. Total number of  words = {len(_words)}"
+    )
     words_with_hyponyms = {}
 
     # https://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks
@@ -64,7 +110,10 @@ def get_words_with_hyponyms(_words):
             yield lst[i : i + n]
 
     async def get_hyponym(session, word):
-        print("called get hyponyms")
+        """Async method for fetching a list of hyponyms associated with a word."""
+
+        print(f"Fetching hyponyms for specific word which is {word}")
+
         async with session.get(
             f"http://api.datamuse.com/words?rel_spc={word}"
         ) as response:
@@ -72,11 +121,16 @@ def get_words_with_hyponyms(_words):
                 words_with_hyponyms[word] = await response.json()
                 print("Read {0} from {1}".format(response.content_length, word))
             except Exception as e:
-                print(e)
+                print(f"Something went wrong whilst making the API call", e)
                 pass
 
     async def get_all_hyponyms(words):
-        print("called get all hyponyms")
+        """Async method for fetching hyponyms associated with words."""
+
+        print(
+            f"Queueing a list of words to fetch their hyponyms, Number of words is: {len(words)}"
+        )
+
         async with aiohttp.ClientSession() as session:
             tasks = []
             for word in words:
@@ -84,8 +138,9 @@ def get_words_with_hyponyms(_words):
                 tasks.append(task)
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    words_chunks = list(chunks(_words, 100000))
+    words_chunks = list(chunks(_words, 100000))  # chunk words into 100000 portions
 
+    # loop through chunks and fetch hyponyms
     for word_chunks in words_chunks:
         start_time = time.time()
         asyncio.get_event_loop().run_until_complete(get_all_hyponyms(word_chunks))
@@ -96,101 +151,63 @@ def get_words_with_hyponyms(_words):
 
 
 def save_words_with_hyponyms(_words, file_name):
-    with open(f"{DATA_ROOT}/{file_name}", "w") as file:
+    """Saves json data to a file.
+
+    Serves as a utility function for saving a dictionary of words with their hyponyms to file
+    i.e given words and filename, this function saves the words to a file with the given filename
+
+        Typical usage example:
+
+        save_words_with_hyponyms(words, file_name)
+
+    Args:
+        _words: A dictionary of words with their corresponding hyponyms
+        file_name: Name of file that would be used to save the dictionary of words
+
+    Returns:
+        Returns `True` signifying that the program run successfully
+
+    Raises:
+        IOError: An error occurred saving file ... No sure but basically something funky happned when saving file
+    """
+
+    with open(f"{DATA_PATH}/{file_name}", "w") as file:
         file.write(json.dumps(_words))  # use `json.loads` to do the reverse
     return True
 
 
-def load_words(filename):
-    if filename == "":
-        return {}
-    with open(filename, "r") as reader:
-        words = reader.readlines()
-        words = json.loads(words[0])
-    return words
+def main(script_args, _logger=None, run_id=None):
+    """Main function that prepares train data.
 
+    This function calls other functions and generates train data for examining distributed word embeddings
 
-def get_max_length_from_words(_words):
-    max_length = 0
-    for index, word in enumerate(_words):
-        len_words = len(_words[word])
-        if len_words > max_length:
-            max_length = len_words
-    return max_length
+        Typical usage example:
 
+        main(script_args)
 
-def get_words_with_extracted_features(words, max_length):
-    def gen_words_with_extracted_features(key, word):
-        print(f"{key}: has been queued for processing")
-        features = [data["word"] for data in word]
-        length_left = max_length - len(features)
-        features = features + [" " for _ in range(length_left)]
-        return key, sorted(features)
+    Args:
+        script_args: argparse variables obtained at the time of running script
+        _logger: A python logger object for logging run data
+        run_id: A uuid4 identifier for tagging runs
 
-    results = Parallel(n_jobs=num_cores)(
-        delayed(gen_words_with_extracted_features)(key, word)
-        for key, word in words.items()
-    )
-    words_with_extracted_features = {key: feature for key, feature in results}
+    Returns:
+        function returns nothings hence returns implicit None
+    """
+    if not _logger:
+        _logger = logger
 
-    return words_with_extracted_features
+    if not run_id:
+        run_id = generate_uuid()
 
+    file_name = ""  # declared to ensure file_name is always set
 
-def save_train_features(words_with_extracted_features_path, words, temp_file_path):
-    print("make sure temp_train folder is empty before proceding")
-    wwef_df = pd.read_csv(words_with_extracted_features_path, index_col=0)
-
-    def gen_features(word):
-        features = [data["word"] for data in word]
-        return features
-
-    all_features = Parallel(n_jobs=num_cores)(
-        delayed(gen_features)(word) for _, word in words.items()
-    )
-    final_features = [value for feature in all_features for value in feature]
-
-    all_features = set(final_features)
-
-    def process_final_data(args):
-        # write to work with chucks
-        word, c_row = args
-        print("processing final data")
-        _fwe_df = pd.DataFrame(
-            0,
-            index=np.arange(1, dtype=np.byte),
-            columns=sorted(list(all_features)),
-            dtype=np.byte,
-        )
-        _fwe_df.insert(loc=0, column="actual_words", value=word)
-        _fwe_df.set_index("actual_words", inplace=True)
-
-        for _index, _row in _fwe_df.iterrows():
-            for _data in c_row:
-                if _row.get(_data) is not None:
-                    _fwe_df.at[_index, _data] = 1
-        # It is assumed that at any point in time, temp will contain only data for current run.
-        _file_name = f"{DATA_ROOT}/temp_train/{script_args.data_source}train_{datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv"
-        _fwe_df.to_csv(_file_name)
-        return _file_name
-
-    file_names = []
-    chunks = np.array_split(wwef_df, 1000000)
-    for cnt, chunk in enumerate(chunks):
-        file_name = Parallel(n_jobs=num_cores)(
-            delayed(process_final_data)((index, row)) for index, row in chunk.iterrows()
-        )
-        file_names += file_name
-
-    with open(temp_file_path, "w",) as f:
-        for item in file_names:
-            f.write("%s\n" % item)
-
-
-def main(script_args):
-    file_name = ""
+    # check if data_source is embeddings or common_words
     if script_args.data_source == "embeddings":
 
+        # This is done to allow for reading large files.
+        # Honestly I've forgotten why I did this, but just know it's important :)
         # https://stackoverflow.com/a/15063941/1817530
+
         max_int = sys.maxsize
         while True:
             # decrease the max_int value by factor 10
@@ -202,9 +219,9 @@ def main(script_args):
             except OverflowError:
                 max_int = int(max_int / 10)
 
-        words_from_embeddings = f"{DATA_ROOT}/words_from_embeddings.csv"
+        words_from_embeddings = f"{DATA_PATH}/words_from_embeddings.csv"
         if not Path(words_from_embeddings).is_file():
-            words = get_words_from_embeddings()
+            words = get_words_from_embeddings(_logger)
             with open(words_from_embeddings, "w", encoding="utf-8") as result_file:
                 wr = csv.writer(result_file, dialect="excel")
                 wr.writerows([words])
@@ -212,47 +229,95 @@ def main(script_args):
             with open(words_from_embeddings, "r", encoding="utf-8") as f:
                 reader = csv.reader(f, quoting=csv.QUOTE_NONE)
                 words = list(reader)
-        words = words[0]
+            words = words[0]
+        _logger.info(
+            f"Number of common words found in all embeddings dataset is {len(words)}"
+        )
         assert (
             len(words)
-            <= 2_702_150  # number is hard coded since The minimum number of words in all word embeddings is 2_702_150
-        ), "The minimum number of words in all word embeddings is 2_702_150 hence intersection should be less"
+            <= 400_000  # number is hard coded since The minimum number of words in all word embeddings is 400_000
+        ), "The minimum number of words in all word embeddings is 400_000 hence intersection should be less"
         words = re.findall(r"'(\w+)'", str(words))
-        file_name = f"{DATA_ROOT}/_words_from_word_embeddings_with_hyponyms.txt"
+        file_name = f"{DATA_PATH}/_words_from_word_embeddings_with_hyponyms.txt"
         if not Path(file_name).is_file():
             words_with_hyponyms = get_words_with_hyponyms(words)
             save_words_with_hyponyms(
                 words_with_hyponyms, "_words_from_word_embeddings_with_hyponyms.txt"
             )
 
-        print(len(words))
-        exit()
-
     elif script_args.data_source == "common_words":
 
-        with open(f"{DATA_ROOT}/corncob_lowercase.txt", "r") as reader:
+        with open(f"{DATA_PATH}/corncob_lowercase.txt", "r") as reader:
             content = reader.readlines()
             content = [line.strip() for line in content]
-        file_name = f"{DATA_ROOT}/_words_with_hyponyms.txt"
+        file_name = f"{DATA_PATH}/_words_with_hyponyms.txt"
         if not Path(file_name).is_file():
             words_with_hyponyms = get_words_with_hyponyms(content)
             save_words_with_hyponyms(words_with_hyponyms, "_words_with_hyponyms.txt")
 
-    words_with_extracted_features_path = (
-        f"{DATA_ROOT}/words_with_extracted_features_{script_args.data_source}.csv"
-    )
-    words = load_words(file_name)
-    if not Path(words_with_extracted_features_path).is_file():
-        max_length = get_max_length_from_words(words)
-        words_with_extracted_features = get_words_with_extracted_features(
-            words, max_length
-        )
-        wwef_df = pd.DataFrame.from_dict(words_with_extracted_features, orient="index")
-        wwef_df.to_csv(words_with_extracted_features_path)
+    with open(file_name, "r") as reader:
+        words = reader.readlines()
+        words = json.loads(words[0])
 
-    temp_file_path = f"{DATA_ROOT}/temp_train_{script_args.data_source}_{datetime.datetime.now().strftime('%Y_%m')}.txt"
-    if not Path(temp_file_path).is_file():
-        save_train_features(words_with_extracted_features_path, words, temp_file_path)
+    _logger.info(
+        f"Total number of words with hyponyms obtained after making API calls is {len(words)}."
+    )
+    words_from_word_embeddings_with_hyponyms = [
+        (key, [value["word"] for value in values]) for key, values in words.items()
+    ]
+
+    max_hyp = 0
+    for data in words_from_word_embeddings_with_hyponyms:
+        max_hyp = len(data[1]) if len(data[1]) > max_hyp else max_hyp
+        print(
+            f"current biggest number of hypohyms associated with a word is {max_hyp} and the word is {data[0]}"
+        )
+
+    final_words = []
+    for word in words_from_word_embeddings_with_hyponyms:
+        word = list(word)
+        word[1] += [""] * (max_hyp - len(word[1]))
+        final_words.append((word[0], word[1]))
+
+    all_features = []
+    for word in words:
+        features = [data["word"] for data in words[word]]
+        all_features += features
+    all_features = set(all_features)
+
+    _logger.info(f"Total number of hyponyms i.e unique hyponyms is {len(all_features)}")
+
+    tmp_file = f"{DATA_PATH}/{script_args.data_source}_words.csv"
+    with open(tmp_file, "w", encoding="utf-8") as f:
+        writer = csv.writer(f, lineterminator="\n")
+        for tup in final_words:
+            writer.writerow([tup[0], *tup[1]])
+
+    df = pd.read_csv(
+        tmp_file, header=None
+    )  # Add this parameter `low_memory=False` to silence warning :)
+    fwe_df = pd.DataFrame(
+        0, index=np.arange(len(df)), columns=sorted(list(all_features))
+    )
+    df.set_index(0, inplace=True)
+    fwe_df.insert(loc=0, column="actual_words", value=list(df.index))
+    fwe_df.set_index("actual_words", inplace=True)
+
+    for index, row in fwe_df.iterrows():
+        for data in df.loc[index].iteritems():
+            if row.get(data[1]) is not None:
+                fwe_df.at[index, data[1]] = 1
+
+    if script_args.data_source == "embeddings":
+        fwe_df.to_csv(f"{DATA_PATH}/word_{script_args.data_source}_train.csv")
+    else:
+        fwe_df.to_csv(f"{DATA_PATH}/train.csv")
+    shape = fwe_df.shape
+    _logger.info(
+        f"Total number of words and hyponyms is {shape}, \
+        where the first value is the number of words and the second the number of unique hyponyms"
+    )
+    _logger.info("Done preparing train data.")
 
 
 if __name__ == "__main__":
@@ -264,5 +329,5 @@ if __name__ == "__main__":
         default="embeddings",
         help="The source of data to process, it's either `embeddings` or `common_words`",
     )
-    script_args = parser.parse_args()
-    main(script_args)
+    args: Namespace = parser.parse_args()
+    main(args)
