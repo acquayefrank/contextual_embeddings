@@ -348,8 +348,8 @@ def main(script_args):
     )
     print(f"Total Number of word embeddings: {total_number_of_word_embeddings}")
 
-    # using sequential backend due to some kind of race condition whilst training models
-    _ = Parallel(n_jobs=-1, backend="sequential", verbose=5, require=None)(
+    # use a sequential backend if you encounter strange errors due to some kind of race condition whilst training models
+    _ = Parallel(n_jobs=-1, backend="threading", verbose=5, require=None)(
         delayed(train_on_specific_embedding)(
             word_embedding,
             total_number_of_word_embeddings,
