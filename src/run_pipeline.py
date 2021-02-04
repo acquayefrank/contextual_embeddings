@@ -4,7 +4,8 @@ from datetime import datetime
 
 from .prepare_train import main as main_prepare_train
 from .process_train import main as main_process_train
-from .utils import get_logger, generate_uuid
+from .train import main as main_train
+from .utils import generate_uuid, get_logger, get_train_run_parser
 
 UUID = generate_uuid()
 
@@ -28,45 +29,27 @@ def main(script_args):
     """
     if not script_args.run_id:
         script_args.run_id = UUID
+
     logger = get_logger(run_id=script_args.run_id)
-    print(f"UUID for run is: {UUID}")
+    print(f"UUID for run is: {script_args.run_id}")
     logger.info(f"preparing train data, started at: {datetime.now()}")
     main_prepare_train(script_args, logger)
 
-    print(f"UUID for run is: {UUID}")
+    print(f"UUID for run is: {script_args.run_id}")
     logger.info(f"processing train data, started at: {datetime.now()}")
     main_process_train(script_args, logger)
 
-    print(f"UUID for run is: {UUID}")
-    print("yet to train")
+    print(f"UUID for run is: {script_args.run_id}")
+    logger.info(f"training, started at: {datetime.now()}")
+    main_train(script_args)
+
+    print(f"UUID for run is: {script_args.run_id}")
     print("yet to generate report")
     print("yet to visualize models")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-ds",
-        "--data_source",
-        type=str,
-        default="embeddings",
-        help="The source of data to process, it's either `embeddings` or `common_words`",
-    )
-    parser.add_argument(
-        "-id",
-        "--run_id",
-        type=str,
-        default=None,
-        help="Provide a unique identifier which would be used to track the running of the experiment,\
-         in the case where it's not provided one will be generated for you. \
-         In order to continue the experiment from when it failed,provide it's unique identifier",
-    )
-    parser.add_argument(
-        "-t",
-        "--threshold",
-        type=int,
-        default=100,
-        help="The threshold for filtering columns of hyponyms",
-    )
+    parser = get_train_run_parser(parser)
     args: Namespace = parser.parse_args()
     main(args)

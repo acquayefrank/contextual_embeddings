@@ -1,8 +1,10 @@
-import sys
+import base64
 import datetime
 import logging
+import os
+import socket
+import sys
 import uuid
-import base64
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,7 +23,6 @@ from sklearn.metrics import (
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 
-from data import COMMON_WORDS_FINAL_DATA
 from models import (
     FASTTEXT_CRAWL_SUB_300D,
     FASTTEXT_CRAWL_VEC_300D,
@@ -39,6 +40,7 @@ from models import (
     GLOVE_TWITTER_27B_200D,
     WORD2VEC_GOOGLE_NEWS_300D,
 )
+
 from .logs import LOGS_ROOT as LOG_PATH
 
 fig_size = (15, 10)
@@ -92,10 +94,17 @@ class Logger:
 
         self.param_string = self.params_help(args)
 
-        self.writer = SummaryWriter(
-            comment="%s-%d%s" % (self.today, self.today_seconds, self.param_string,)
+        current_time = datetime.datetime.now().strftime("%b%d_%H-%M-%S")
+        comment = "%s-%d%s" % (self.today, self.today_seconds, self.param_string)
+        log_dir = os.path.join(
+            "runs", current_time + "_" + socket.gethostname() + "_" + args.run_id
         )
+
+        self.writer = SummaryWriter(log_dir=log_dir)
         self.verbose = args.verbose
+
+        with open(f"{log_dir}/metadata.txt", "w") as text_file:
+            print(f"Params used to run the experiment: {comment}", file=text_file)
 
     def help(self, verbose=0):
         if verbose < 100:
@@ -196,9 +205,9 @@ def complex_df_to_tensor(_df):
     return torch.stack(temp_x, 0)
 
 
-def data_loader(word, data_source=None):
-    df = pd.read_csv(COMMON_WORDS_FINAL_DATA)
-    df = df.drop(["GLOVE.6B"], axis=1, errors="ignore")
+def data_loader(word, file_name):
+    df = pd.read_csv(file_name)
+    # df = df.drop(["GLOVE.6B"], axis=1, errors="ignore")
     df["word_embeddings"] = df["actual_words"].apply(_get_word_embeddings)
     df.dropna(inplace=True)
     x_data = df.loc[:, df.columns == "word_embeddings"]
@@ -211,9 +220,9 @@ def data_loader(word, data_source=None):
 class DatasetLoader(torch.utils.data.Dataset):
     "Characterizes a dataset for PyTorch"
 
-    def __init__(self, word, selected_partition, data_source=None):
+    def __init__(self, word, selected_partition, file_name):
         "Initialization"
-        x_data, y_data, indexes = data_loader(word, data_source)
+        x_data, y_data, indexes = data_loader(word, file_name)
 
         # Datasets
         partition = {"train": indexes, "validation": indexes}
@@ -331,8 +340,8 @@ def evaluate(model, x_data, y_data):
 
 
 ####################################################### Get all words ##########################################################
-def get_words(threshold=100):
-    df = pd.read_csv(COMMON_WORDS_FINAL_DATA)
+def get_words(file_name, threshold=100):
+    df = pd.read_csv(file_name)
     subset = df[df.columns.difference(["actual_words", "GLOVE.6B"])]
     # remove columns below threshold
     df_with_threshold = subset.loc[:, (subset.sum(axis=0) >= threshold)].copy()
@@ -355,13 +364,11 @@ def get_logger(run_id=None):
     if not run_id:
         run_id = generate_uuid()
 
+    file_path = f"{LOG_PATH}/{run_id}_log_{datetime.datetime.now().strftime('%y_%m_%d_%H_%M_%S')}.log"
     if not logger.handlers:
         # create file handler which logs even debug messages
-        fh = logging.FileHandler(
-            f"{LOG_PATH}/{run_id}_log_{datetime.datetime.now().strftime('%y_%m_%d_%H_%M_%S')}.log"
-        )
+        fh = logging.FileHandler(file_path)
         fh.setLevel(logging.DEBUG)
-
         # create console handler with a higher log level
         ch = logging.StreamHandler(stream=sys.stdout)
         ch.setLevel(logging.DEBUG)
@@ -376,6 +383,7 @@ def get_logger(run_id=None):
         # add the handlers to the logger
         logger.addHandler(fh)
         logger.addHandler(ch)
+        logger.file_path = file_path
 
     return logger
 
@@ -387,3 +395,99 @@ def generate_uuid():
         an ascii friendly uuid4 string.
     """
     return base64.urlsafe_b64encode(uuid.uuid4().bytes).rstrip(b"=").decode("ascii")
+
+
+def boolean_string(s):
+    if s not in {"False", "True"}:
+        raise ValueError("Not a valid boolean string")
+    return s == "True"
+
+
+def get_train_run_parser(parser):
+    parser.add_argument(
+        "-ds",
+        "--data_source",
+        type=str,
+        default="embeddings",
+        help="The source of data to process, it's either `embeddings` or `common_words`",
+    )
+    parser.add_argument(
+        "-id",
+        "--run_id",
+        type=str,
+        default=None,
+        help="Provide a unique identifier which would be used to track the running of the experiment,\
+            in the case where it's not provided one will be generated for you. \
+            In order to continue the experiment from when it failed,provide it's unique identifier",
+    )
+    parser.add_argument(
+        "-t",
+        "--threshold",
+        type=int,
+        default=100,
+        help="The threshold for filtering columns of hyponyms",
+    )
+    parser.add_argument(
+        "-e",
+        "--epoch_num",
+        type=int,
+        default="5000",
+        help="Number of epochs run. Default: 5000",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        default="70",
+        help="Controls the information shown during training. Default: 70",
+    )
+    parser.add_argument(
+        "-w",
+        "--word",
+        type=str,
+        default="move",
+        help="The word you would want to train for. Default: move",
+    )
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        type=int,
+        default=100,
+        help="Controls the batch size. Default: 100",
+    ),
+    parser.add_argument(
+        "-a",
+        "--all",
+        type=boolean_string,
+        default=True,
+        help="If set to true, training is done on entire dataset. Default: True",
+    )
+    parser.add_argument(
+        "-ae",
+        "--all_embeddings",
+        type=boolean_string,
+        default=False,
+        help="If set to true, training is done on all word embeddings. Default: False",
+    )
+    parser.add_argument(
+        "-am",
+        "--all_models",
+        type=boolean_string,
+        default=False,
+        help="If set to true, training is done on all models. Default: False",
+    )
+    parser.add_argument(
+        "-lr",
+        "--learning_rate",
+        type=float,
+        default=0.0001,
+        help="Controls learning rate. Default: 0.0001",
+    )
+    parser.add_argument(
+        "-we",
+        "--word_embeddings",
+        type=str,
+        default="GLOVE_6B_300D",
+        help="Controls which word embedding should be used. Default: GLOVE_6B_300D",
+    )
+    return parser

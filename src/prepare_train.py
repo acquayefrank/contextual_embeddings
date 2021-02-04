@@ -1,4 +1,3 @@
-import time
 import argparse
 import asyncio
 import csv
@@ -16,11 +15,10 @@ import pandas as pd
 
 from data import DATA_ROOT as DATA_PATH
 
-from .utils import _load_word_embedding_model, embeddings, get_logger, generate_uuid
+from .utils import _load_word_embedding_model, embeddings, generate_uuid, get_logger
 
 UUID = generate_uuid()
 num_cores = multiprocessing.cpu_count() - 1
-logger = get_logger(run_id=UUID)
 
 
 def get_words_from_embeddings(_logger=None):
@@ -35,7 +33,7 @@ def get_words_from_embeddings(_logger=None):
         An intersected list of words from all word embeddings
     """
     if not _logger:
-        _logger = logger
+        _logger = get_logger(run_id=UUID)
 
     min_number_of_words_in_all_embeddings = 0
     word_emb = ""
@@ -194,7 +192,7 @@ def main(script_args, _logger=None):
         function returns nothings hence returns implicit None
     """
     if not _logger:
-        _logger = logger
+        _logger = get_logger(run_id=UUID)
 
     if not script_args.run_id:
         script_args.run_id = UUID
@@ -274,15 +272,7 @@ def main(script_args, _logger=None):
     max_hyp = 0
     for data in words_from_word_embeddings_with_hyponyms:
         max_hyp = len(data[1]) if len(data[1]) > max_hyp else max_hyp
-        print(
-            f"current biggest number of hypohyms associated with a word is {max_hyp} and the word is {data[0]}"
-        )
-
-    final_words = []
-    for word in words_from_word_embeddings_with_hyponyms:
-        word = list(word)
-        word[1] += [""] * (max_hyp - len(word[1]))
-        final_words.append((word[0], word[1]))
+        print(f"current biggest number of hypohyms associated with a word is {max_hyp}")
 
     all_features = []
     for word in words:
@@ -290,37 +280,48 @@ def main(script_args, _logger=None):
         all_features += features
     all_features = set(all_features)
 
-    _logger.info(f"Total number of hyponyms i.e unique hyponyms is {len(all_features)}")
-
     tmp_file = f"{DATA_PATH}/{script_args.run_id}_{script_args.data_source}_words.csv"
-    with open(tmp_file, "w", encoding="utf-8") as f:
-        writer = csv.writer(f, lineterminator="\n")
-        for tup in final_words:
-            writer.writerow([tup[0], *tup[1]])
+    if not Path(tmp_file).is_file():
+        final_words = []
+        for word in words_from_word_embeddings_with_hyponyms:
+            word = list(word)
+            word[1] += [""] * (max_hyp - len(word[1]))
+            final_words.append((word[0], word[1]))
 
-    df = pd.read_csv(
-        tmp_file, header=None
-    )  # Add this parameter `low_memory=False` to silence warning :)
-    fwe_df = pd.DataFrame(
-        0, index=np.arange(len(df)), columns=sorted(list(all_features))
-    )
-    df.set_index(0, inplace=True)
-    fwe_df.insert(loc=0, column="actual_words", value=list(df.index))
-    fwe_df.set_index("actual_words", inplace=True)
+        _logger.info(
+            f"Total number of hyponyms i.e unique hyponyms is {len(all_features)}"
+        )
 
-    for index, row in fwe_df.iterrows():
-        for data in df.loc[index].iteritems():
-            if row.get(data[1]) is not None:
-                fwe_df.at[index, data[1]] = 1
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            writer = csv.writer(f, lineterminator="\n")
+            for tup in final_words:
+                writer.writerow([tup[0], *tup[1]])
 
-    fwe_df.to_csv(
+    train_csv_file = (
         f"{DATA_PATH}/{script_args.run_id}_word_{script_args.data_source}_train.csv"
     )
-    shape = fwe_df.shape
-    _logger.info(
-        f"Total number of words and hyponyms is {shape}, \
-        where the first value is the number of words and the second the number of unique hyponyms"
-    )
+    if not Path(train_csv_file).is_file():
+        df = pd.read_csv(
+            tmp_file, header=None
+        )  # Add this parameter `low_memory=False` to silence warning :)
+        fwe_df = pd.DataFrame(
+            0, index=np.arange(len(df)), columns=sorted(list(all_features))
+        )
+        df.set_index(0, inplace=True)
+        fwe_df.insert(loc=0, column="actual_words", value=list(df.index))
+        fwe_df.set_index("actual_words", inplace=True)
+
+        for index, row in fwe_df.iterrows():
+            for data in df.loc[index].iteritems():
+                if row.get(data[1]) is not None:
+                    fwe_df.at[index, data[1]] = 1
+
+        fwe_df.to_csv(train_csv_file)
+        shape = fwe_df.shape
+        _logger.info(
+            f"Total number of words and hyponyms is {shape}, \
+            where the first value is the number of words and the second the number of unique hyponyms"
+        )
     _logger.info("Done preparing train data.")
 
 

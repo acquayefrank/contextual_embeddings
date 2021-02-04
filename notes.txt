@@ -51,4 +51,36 @@ Reorder rows to be dendogrum or heirachical cluster
 Change numbers to names of words
 
 
-Save all common words 
+Save all common words
+
+
+   # Sometimes parallel processing acts in a strange manner, in such case use a simple loop commented below
+    # _ = Parallel(n_jobs=-1, backend="threading", verbose=5, require=None)(
+    #     delayed(train_on_specific_embedding)(
+    #         word_embedding,
+    #         total_number_of_word_embeddings,
+    #         script_args,
+    #         writer,
+    #         words,
+    #         filename,
+    #         trained_models_root,
+    #         params,
+    #         max_epochs,
+    #         trained_models,
+    #     )
+    #     for word_embedding in word_embeddings
+    # )
+
+    # for word_embedding in word_embeddings:
+    #     train_on_specific_embedding(
+    #         word_embedding,
+    #         total_number_of_word_embeddings,
+    #         script_args,
+    #         writer,
+    #         words,
+    #         filename,
+    #         trained_models_root,
+    #         params,
+    #         max_epochs,
+    #         trained_models,
+    #     )

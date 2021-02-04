@@ -1,3 +1,4 @@
+from pathlib import Path
 from .fasttext import (
     FASTTEXT_CRAWL_SUB_300D,
     FASTTEXT_CRAWL_VEC_300D,
@@ -13,5 +14,6 @@ from .glove_twitter_27B import (
     GLOVE_TWITTER_27B_100D,
     GLOVE_TWITTER_27B_200D,
 )
-from .trained_models import TRAINED_MODELS_ROOT
 from .word2vec import WORD2VEC_GOOGLE_NEWS_300D
+
+MODELS_PATH = Path(__file__).parent
