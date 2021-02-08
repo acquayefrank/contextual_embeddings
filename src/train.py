@@ -1,8 +1,7 @@
 import argparse
 import os
 from os.path import isfile, join
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from typing import Any, Union
 
 import torch
 from joblib import Parallel, delayed
@@ -172,7 +171,14 @@ def get_trained_models(models_filenames):
     return trained_models
 
 
-def run_test_on_models(script_args, filename, writer, model):
+def run_test_on_models(script_args, filename, writer, model_data, embedding):
+    model = model_data[0]
+    script_args.word = model_data[1]
+    emb_name = model_data[2]
+
+    if emb_name != embedding:
+        return False
+
     # Load
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -180,8 +186,13 @@ def run_test_on_models(script_args, filename, writer, model):
     # Tests and Accuracies
     x_data, y_data, _ = data_loader(script_args.word, filename)
 
-    writer.add_graph(model, x_data)
-
+    try:
+        writer.add_graph(model, x_data)
+    except Exception as e:
+        print(e)
+    print(x_data.shape)
+    print(y_data.shape)
+    print(model)
     scores = evaluate(model, x_data, y_data)
 
     writer.add_text(
@@ -246,6 +257,8 @@ def run_test_on_models(script_args, filename, writer, model):
         plot_precision_recall(scores["recall"], scores["precision"], script_args.word),
     )
 
+    return True
+
 
 def get_actual_models(trained_models_root, model_type):
     model_paths = [
@@ -253,21 +266,26 @@ def get_actual_models(trained_models_root, model_type):
         for f in os.listdir(trained_models_root)
         if isfile(join(trained_models_root, f))
     ]
+
     all_models = [
         model for model in model_paths if model.split("_")[-1][:-4] == model_type
     ]
+
     models = []
     for index, mdl in enumerate(all_models):
         emb_name = "_".join(mdl.split("_")[1:-1])
         if embeddings.get(emb_name):
             embeddings_data = embeddings.get(emb_name)
+            word = mdl.split("_")[0]
         else:
-            embeddings_data = embeddings.get("_".join(mdl.split("_")[3:-1]))
+            emb_name = "_".join(mdl.split("_")[3:-1])
+            embeddings_data = embeddings.get(emb_name)
+            word = "_".join(mdl.split("_")[:3])
         file_path, dim, embedding_type = embeddings_data
         if model_type == "LogisticRegression":
-            models.append(LogisticRegression(dim, 1))
+            models.append((LogisticRegression(dim, 1), word, emb_name))
         elif model_type == "SingleLayeredNN":
-            models.append(SingleLayeredNN(dim, dim, 1))
+            models.append((SingleLayeredNN(dim, dim, 1), word, emb_name))
     return models
 
 
@@ -349,7 +367,8 @@ def main(script_args):
     print(f"Total Number of word embeddings: {total_number_of_word_embeddings}")
 
     # use a sequential backend if you encounter strange errors due to some kind of race condition whilst training models
-    _ = Parallel(n_jobs=-1, backend="threading", verbose=5, require=None)(
+    # Run each embedding as it's own thread
+    _ = Parallel(n_jobs=-1, backend="sequential", verbose=5, require=None)(
         delayed(train_on_specific_embedding)(
             word_embedding,
             total_number_of_word_embeddings,
@@ -366,21 +385,33 @@ def main(script_args):
         for word_embedding in word_embeddings
     )
 
-    # Tests for LogisticRegression
-    _ = Parallel(n_jobs=-1, backend="threading", verbose=5)(
-        delayed(run_test_on_models)(script_args, filename, writer, model)
-        for model in get_actual_models(
-            trained_models_root, model_type="LogisticRegression"
-        )
-    )
+    embedding: Union[str, Any]
+    for embedding in word_embeddings:
 
-    # Tests for SingleLayeredNN
-    _ = Parallel(n_jobs=-1, backend="threading", verbose=5)(
-        delayed(run_test_on_models)(script_args, filename, writer, model)
-        for model in get_actual_models(
-            trained_models_root, model_type="SingleLayeredNN"
+        file_path, _, embedding_type = embeddings.get(embedding)
+        utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
+            file=file_path, word_embedding_type=embedding_type
         )
-    )
+
+        # Tests for LogisticRegression
+        _ = Parallel(n_jobs=-1, backend="sequential", verbose=5)(
+            delayed(run_test_on_models)(
+                script_args, filename, writer, model_data, embedding
+            )
+            for model_data in get_actual_models(
+                trained_models_root, model_type="LogisticRegression"
+            )
+        )
+
+        # Tests for SingleLayeredNN
+        _ = Parallel(n_jobs=-1, backend="sequential", verbose=5)(
+            delayed(run_test_on_models)(
+                script_args, filename, writer, model_data, embedding
+            )
+            for model_data in get_actual_models(
+                trained_models_root, model_type="SingleLayeredNN"
+            )
+        )
 
     logger.print_time()
     writer.close()
