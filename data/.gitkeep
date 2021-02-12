@@ -1,0 +1,11 @@
+--2021-02-12 14:49:25--  https://disk.yandex.com/d/arjUPOn9AY7uaw
+Resolving disk.yandex.com (disk.yandex.com)... 87.250.250.50, 2a02:6b8::2:50
+Connecting to disk.yandex.com (disk.yandex.com)|87.250.250.50|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 31324 (31K) [text/html]
+Saving to: ‘arjUPOn9AY7uaw’
+
+     0K .......... .......... ..........                      100% 3,00M=0,01s
+
+2021-02-12 14:49:25 (3,00 MB/s) - ‘arjUPOn9AY7uaw’ saved [31324/31324]
+

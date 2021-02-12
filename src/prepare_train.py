@@ -41,7 +41,7 @@ def get_words_from_embeddings(_logger=None):
 
     for index, embedding in enumerate(embeddings):
         print(embedding, " :being processed ", index, " :embedding count")
-        file_path, num_features, word_embedding_type = embeddings.get(embedding)
+        file_path, _, word_embedding_type = embeddings.get(embedding)
         model = _load_word_embedding_model(
             file=file_path, word_embedding_type=word_embedding_type
         )
@@ -201,21 +201,6 @@ def main(script_args, _logger=None):
 
     # check if data_source is embeddings or common_words
     if script_args.data_source == "embeddings":
-
-        # This is done to allow for reading large files.
-        # Honestly I've forgotten why I did this, but just know it's important :)
-        # https://stackoverflow.com/a/15063941/1817530
-
-        max_int = sys.maxsize
-        while True:
-            # decrease the max_int value by factor 10
-            # as long as the OverflowError occurs.
-
-            try:
-                csv.field_size_limit(max_int)
-                break
-            except OverflowError:
-                max_int = int(max_int / 10)
 
         words_from_embeddings = (
             f"{DATA_PATH}/{script_args.run_id}_words_from_embeddings.csv"
