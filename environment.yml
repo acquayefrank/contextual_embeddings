@@ -4,6 +4,7 @@ channels:
   - pytorch
   - defaults
 dependencies:
+    - python=3.8.5
     - pip
     - pip:
       - aiodns==2.0.0
