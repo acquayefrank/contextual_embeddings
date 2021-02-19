@@ -26,6 +26,8 @@ from .utils import (
     get_train_run_parser,
 )
 
+torch.set_num_threads(4)
+
 
 def train_on_specific_embedding(
     word_embedding,

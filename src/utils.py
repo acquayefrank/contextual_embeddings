@@ -94,7 +94,7 @@ class Logger:
 
         self.param_string = self.params_help(args)
 
-        current_time = datetime.datetime.now().strftime("%b%d_%H-%M-%S")
+        current_time = datetime.datetime.now().strftime("%Y%b%d_%H-%M-%S")
         comment = "%s-%d%s" % (self.today, self.today_seconds, self.param_string)
         log_dir = os.path.join(
             "runs", current_time + "_" + socket.gethostname() + "_" + args.run_id

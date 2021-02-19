@@ -1,10 +1,18 @@
+import os
+import sys
 import argparse
 import datetime
+import glob
 
 import xlsxwriter
 from natsort import natsorted
 from tensorflow.compat.v1.train import summary_iterator
 
+from evaluation import EVALUATION_ROOT as EVALUATION_PATH
+
+PACKAGE_PARENT = '..'
+SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser('__file__'))))
+sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
 def _process_value(value, data, tag, label, num_chunk):
     num_val: float = round(float(value.strip()), 2)
@@ -28,9 +36,9 @@ def _process_value(value, data, tag, label, num_chunk):
     return data
 
 
-def _save_to_excel(meta_data, data):
+def _save_to_excel(meta_data, data, data_source, run_id):
     workbook = xlsxwriter.Workbook(
-        fr'../evaluation/report_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.xlsx'
+        f'{EVALUATION_PATH}/{run_id}_report_{data_source}_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.xlsx'
     )
     worksheet = workbook.add_worksheet("Meta Data")
 
@@ -111,6 +119,27 @@ def _save_to_excel(meta_data, data):
 
 
 def main(script_args):
+    run_path = "./runs/"
+    run_files = glob.glob(os.path.join(run_path, "*", "")) 
+    run_files_with_id = [run_file for run_file in run_files if run_file.split("/")[2].split("_")[-1] == script_args.run_id]
+    max_date = None
+    file_path = ""
+    for run_file_with_id in run_files_with_id:
+        tmp_date = datetime.datetime.strptime( "_".join(run_file_with_id.split("/")[2].split("_")[:-2]), "%Y%b%d_%H-%M-%S")
+        if not max_date:
+            max_date = tmp_date
+            file_path = run_file_with_id
+        elif max_date < tmp_date:
+            max_date = tmp_date
+            file_path = run_file_with_id
+
+    print(max_date)
+    print(script_args.run_id)
+    print(file_path)
+    print(glob.glob(f"{file_path}events.out.tfevents.*"))
+    script_args.file_path = glob.glob(f"{file_path}events.out.tfevents.*")[0]
+    print(script_args.file_path)
+    
     meta_data = set()
     data = {}
     for e in summary_iterator(script_args.file_path):
@@ -136,19 +165,26 @@ def main(script_args):
                 if "_auc/text_summary" == tag[-17:]:
                     data = _process_value(value, data, tag, label="AUC", num_chunk=17)
 
-    _save_to_excel(meta_data, data)
+    _save_to_excel(meta_data, data, script_args.data_source, script_args.run_id)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-f",
-        "--file_path",
+        "-id",
+        "--run_id",
         type=str,
-        default=r"..\runs\Dec18_17-17-09_LAPTOP-TMI0A1R42020-12-18-62229_epoch_num-5000_verbose-70_word-move_batch_size"
-        "-100_all-True_all_embeddings-True_all_models-True_learning_rate-0.0001_word_embeddings-GLOVE_6B_300D"
-        "\events.out.tfevents.1608301031.LAPTOP-TMI0A1R4.7900.0",
-        help="File Path to read even logs from",
+        required=True,
+        help="Provide a unique identifier which would be used to track the running of the experiment,\
+            in the case where it's not provided one will be generated for you. \
+            In order to continue the experiment from when it failed,provide it's unique identifier",
+    )
+    parser.add_argument(
+        "-ds",
+        "--data_source",
+        type=str,
+        default="embeddings",
+        help="The source of data to process, it's either `embeddings` or `common_words`",
     )
     args = parser.parse_args()
     main(args)
