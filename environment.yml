@@ -60,7 +60,7 @@ dependencies:
       - natsort==7.1.0
       - networkx==2.5
       - nltk==3.3
-      - numpy==1.18.5
+      - numpy
       - nvidia-ml-py3==7.352.0
       - opencensus==0.7.11
       - opencensus-context==0.1.2
@@ -109,6 +109,6 @@ dependencies:
       - wrapt==1.12.1
       - xarray==0.16.2
       - xlsxwriter==1.3.7
-      - tensorboard==2.3.0
+      - tensorboard==2.4
       - seaborn==0.11.1
       - tensorflow==2.4.1
