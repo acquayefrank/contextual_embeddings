@@ -368,7 +368,7 @@ def main(script_args):
 
     # use a sequential backend if you encounter strange errors due to some kind of race condition whilst training models
     # Run each embedding as it's own thread
-    _ = Parallel(n_jobs=-1, backend="sequential", verbose=5, require=None)(
+    _ = Parallel(n_jobs=8, backend="sequential", verbose=5, require=None)(
         delayed(train_on_specific_embedding)(
             word_embedding,
             total_number_of_word_embeddings,
@@ -394,7 +394,7 @@ def main(script_args):
         )
 
         # Tests for LogisticRegression
-        _ = Parallel(n_jobs=-1, backend="sequential", verbose=5)(
+        _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
             delayed(run_test_on_models)(
                 script_args, filename, writer, model_data, embedding
             )
@@ -404,7 +404,7 @@ def main(script_args):
         )
 
         # Tests for SingleLayeredNN
-        _ = Parallel(n_jobs=-1, backend="sequential", verbose=5)(
+        _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
             delayed(run_test_on_models)(
                 script_args, filename, writer, model_data, embedding
             )
@@ -415,7 +415,7 @@ def main(script_args):
 
     logger.print_time()
     writer.close()
-    open(f"{script_args.run_id}.lock", "w").close()
+    open(f"{trained_models_root}/{script_args.run_id}.lock", "w").close()
     print("Done. Bye.")
 
 
