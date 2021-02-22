@@ -174,23 +174,20 @@ def get_trained_models(models_filenames):
     return trained_models
 
 
-def run_test_on_models(script_args, filename, writer, model_data):
+def run_test_on_models(filename, writer, model_data, embedding):
     model = model_data[0]
-    script_args.word = model_data[1]
+    word = model_data[1]
     emb_name = model_data[2]
 
-    file_path, _, embedding_type = embeddings.get(emb_name)
-    utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
-            file=file_path, word_embedding_type=embedding_type
-        )
-
+    if emb_name != embedding:
+        return False
 
     # Load
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     model.to(device)
     # Tests and Accuracies
-    x_data, y_data, _ = data_loader(script_args.word, filename)
+    x_data, y_data, _ = data_loader(word, filename)
 
     try:
         writer.add_graph(model, x_data)
@@ -207,60 +204,60 @@ def run_test_on_models(script_args, filename, writer, model_data):
     )
 
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, Accuracy",
         str(scores["_accuracy"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, F1 Score",
         str(scores["_f1_score"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, roc_auc_score",
         str(scores["_roc_auc_score"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, fpr",
         str(scores["fpr"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, tpr",
         str(scores["tpr"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, average thresholds",
         str(scores["thresholds"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, _auc",
         str(scores["_auc"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, Precision",
         str(scores["precision"]),
     )
     writer.add_text(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, Recall",
         str(scores["recall"]),
     )
 
     writer.add_figure(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, False Positive Rate",
-        plot_tpr(scores["fpr"], scores["tpr"], script_args.word),
+        plot_tpr(scores["fpr"], scores["tpr"], word),
     )
     writer.add_figure(
-        f"Word being trained: {script_args.word}, Word Embeddings being used: {script_args.word_embeddings},\
+        f"Word being trained: {word}, Word Embeddings being used: {embedding},\
                      Model being used: {model}, Precision vs Recall",
-        plot_precision_recall(scores["recall"], scores["precision"], script_args.word),
+        plot_precision_recall(scores["recall"], scores["precision"], word),
     )
 
     return True
@@ -395,21 +392,34 @@ def main(script_args):
         open(f"{trained_models_root}/{script_args.run_id}.lock", "w").close()
 
 
-    # Tests for LogisticRegression
-    _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-        delayed(run_test_on_models)(script_args, filename, writer, model)
-        for model in get_actual_models(
-            trained_models_root, model_type="LogisticRegression"
-        )
-    )
+    embedding: Union[str, Any]
+    for embedding in word_embeddings:
 
-    # Tests for SingleLayeredNN
-    _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-        delayed(run_test_on_models)(script_args, filename, writer, model)
-        for model in get_actual_models(
-            trained_models_root, model_type="SingleLayeredNN"
+        file_path, _, embedding_type = embeddings.get(embedding)
+        utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
+            file=file_path, word_embedding_type=embedding_type
         )
-    ) 
+
+        # Tests for LogisticRegression
+        _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
+            delayed(run_test_on_models)(
+                filename, writer, model_data, embedding
+            )
+            for model_data in get_actual_models(
+                trained_models_root, model_type="LogisticRegression"
+            )
+        )
+
+        # Tests for SingleLayeredNN
+        _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
+            delayed(run_test_on_models)(
+                filename, writer, model_data, embedding
+            )
+            for model_data in get_actual_models(
+                trained_models_root, model_type="SingleLayeredNN"
+            )
+        )
+
 
     logger.print_time()
     writer.close()
