@@ -144,7 +144,6 @@ def main(script_args):
     meta_data = set()
     data = {}
     for e in summary_iterator(script_args.file_path):
-        set_emb = set()
         for v in e.summary.value:
             tag = v.tag
             if "text_summary" in tag:
@@ -160,20 +159,12 @@ def main(script_args):
                         meta_data.add(value)
                     if "Number of words being trained:" in value:
                         meta_data.add(value) 
-                before_keyword, keyword, after_keyword = tag.partition(
-                    " Word Embeddings being used: "
-                )
-                word_embedding = after_keyword.split(",")[0]
-                if word_embedding not in set_emb:
-                    set_emb.add(word_embedding)
-                    print(set_emb)
-                    if "Accuracy/text_summary" == tag[-21:]:
-                        data = _process_value(
-                            value, data, tag, label="Accuracy", num_chunk=21
-                        )
+       
+            if "Accuracy/text_summary" == tag[-21:]:
+                data = _process_value(value, data, tag, label="Accuracy", num_chunk=21)
                        
-                    if "_auc/text_summary" == tag[-17:]:
-                        data = _process_value(value, data, tag, label="AUC", num_chunk=17)
+            if "_auc/text_summary" == tag[-17:]:
+                data = _process_value(value, data, tag, label="AUC", num_chunk=17)
 
     _save_to_excel(meta_data, data, script_args.data_source, script_args.run_id)
 

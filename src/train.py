@@ -2,6 +2,7 @@ import argparse
 import os
 from os.path import isfile, join
 from typing import Any, Union
+from pathlib import Path
 
 import torch
 from joblib import Parallel, delayed
@@ -173,13 +174,16 @@ def get_trained_models(models_filenames):
     return trained_models
 
 
-def run_test_on_models(script_args, filename, writer, model_data, embedding):
+def run_test_on_models(script_args, filename, writer, model_data):
     model = model_data[0]
     script_args.word = model_data[1]
     emb_name = model_data[2]
 
-    if emb_name != embedding:
-        return False
+    file_path, _, embedding_type = embeddings.get(emb_name)
+    utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
+            file=file_path, word_embedding_type=embedding_type
+        )
+
 
     # Load
     use_cuda = torch.cuda.is_available()
@@ -370,54 +374,46 @@ def main(script_args):
 
     # use a sequential backend if you encounter strange errors due to some kind of race condition whilst training models
     # Run each embedding as it's own thread
-    _ = Parallel(n_jobs=8, backend="sequential", verbose=5, require=None)(
-        delayed(train_on_specific_embedding)(
-            word_embedding,
-            total_number_of_word_embeddings,
-            script_args,
-            writer,
-            words,
-            filename,
-            trained_models_root,
-            params,
-            max_epochs,
-            trained_models,
-            *embeddings.get(word_embedding),
+    if not Path(f"{trained_models_root}/{script_args.run_id}.lock").is_file():
+        print("lock file not found hence processing")
+        _ = Parallel(n_jobs=8, backend="sequential", verbose=5, require=None)(
+            delayed(train_on_specific_embedding)(
+                word_embedding,
+                total_number_of_word_embeddings,
+                script_args,
+                writer,
+                words,
+                filename,
+                trained_models_root,
+                params,
+                max_epochs,
+                trained_models,
+                *embeddings.get(word_embedding),
+            )
+            for word_embedding in word_embeddings
         )
-        for word_embedding in word_embeddings
+        open(f"{trained_models_root}/{script_args.run_id}.lock", "w").close()
+
+
+    # Tests for LogisticRegression
+    _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
+        delayed(run_test_on_models)(script_args, filename, writer, model)
+        for model in get_actual_models(
+            trained_models_root, model_type="LogisticRegression"
+        )
     )
 
-    embedding: Union[str, Any]
-    for embedding in word_embeddings:
-
-        file_path, _, embedding_type = embeddings.get(embedding)
-        utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
-            file=file_path, word_embedding_type=embedding_type
+    # Tests for SingleLayeredNN
+    _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
+        delayed(run_test_on_models)(script_args, filename, writer, model)
+        for model in get_actual_models(
+            trained_models_root, model_type="SingleLayeredNN"
         )
-
-        # Tests for LogisticRegression
-        _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-            delayed(run_test_on_models)(
-                script_args, filename, writer, model_data, embedding
-            )
-            for model_data in get_actual_models(
-                trained_models_root, model_type="LogisticRegression"
-            )
-        )
-
-        # Tests for SingleLayeredNN
-        _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-            delayed(run_test_on_models)(
-                script_args, filename, writer, model_data, embedding
-            )
-            for model_data in get_actual_models(
-                trained_models_root, model_type="SingleLayeredNN"
-            )
-        )
+    ) 
 
     logger.print_time()
     writer.close()
-    open(f"{trained_models_root}/{script_args.run_id}.lock", "w").close()
+    open(f"./runs/{script_args.run_id}.lock", "w").close()
     print("Done. Bye.")
 
 
