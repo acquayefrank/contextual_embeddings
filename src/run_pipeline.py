@@ -1,10 +1,12 @@
 import argparse
 from argparse import Namespace
 from datetime import datetime
+from pathlib import Path
 
 from .prepare_train import main as main_prepare_train
 from .process_train import main as main_process_train
 from .train import main as main_train
+from .generate_report import main as main_generate_report
 from .utils import generate_uuid, get_logger, get_train_run_parser
 
 UUID = generate_uuid()
@@ -39,12 +41,15 @@ def main(script_args):
     logger.info(f"processing train data, started at: {datetime.now()}")
     main_process_train(script_args, logger)
 
-    print(f"UUID for run is: {script_args.run_id}")
-    logger.info(f"training, started at: {datetime.now()}")
-    main_train(script_args)
+    if not Path(f"./runs/{script_args.run_id}.lock").is_file():
+        print(f"UUID for run is: {script_args.run_id}")
+        logger.info(f"training, started at: {datetime.now()}")
+        main_train(script_args)
+    else:
+        print("models already trained")
 
     print(f"UUID for run is: {script_args.run_id}")
-    print("yet to generate report")
+    main_generate_report(script_args)
     print("yet to visualize models")
 
 

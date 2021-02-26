@@ -14,32 +14,17 @@ import torch
 import torch.nn.functional as F
 from gensim.models import KeyedVectors
 from sklearn import metrics
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    precision_recall_curve,
-    roc_auc_score,
-)
+from sklearn.metrics import (accuracy_score, f1_score, precision_recall_curve,
+                             roc_auc_score)
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 
-from models import (
-    FASTTEXT_CRAWL_SUB_300D,
-    FASTTEXT_CRAWL_VEC_300D,
-    FASTTEXT_WIKI_SUB_300D,
-    FASTTEXT_WIKI_VEC_300D,
-    GLOVE_6B_50D,
-    GLOVE_6B_100D,
-    GLOVE_6B_200D,
-    GLOVE_6B_300D,
-    GLOVE_42B_300D,
-    GLOVE_840B_300D,
-    GLOVE_TWITTER_27B_25D,
-    GLOVE_TWITTER_27B_50D,
-    GLOVE_TWITTER_27B_100D,
-    GLOVE_TWITTER_27B_200D,
-    WORD2VEC_GOOGLE_NEWS_300D,
-)
+from models import (FASTTEXT_CRAWL_SUB_300D, FASTTEXT_CRAWL_VEC_300D,
+                    FASTTEXT_WIKI_SUB_300D, FASTTEXT_WIKI_VEC_300D,
+                    GLOVE_6B_50D, GLOVE_6B_100D, GLOVE_6B_200D, GLOVE_6B_300D,
+                    GLOVE_42B_300D, GLOVE_840B_300D, GLOVE_TWITTER_27B_25D,
+                    GLOVE_TWITTER_27B_50D, GLOVE_TWITTER_27B_100D,
+                    GLOVE_TWITTER_27B_200D, WORD2VEC_GOOGLE_NEWS_300D)
 
 from .logs import LOGS_ROOT as LOG_PATH
 
@@ -491,3 +476,29 @@ def get_train_run_parser(parser):
         help="Controls which word embedding should be used. Default: GLOVE_6B_300D",
     )
     return parser
+
+
+def get_trained_models(models_filenames):
+    """Get a list of trained models by (word, word_embedding, model_name) stored on disk
+
+    This function fecthes a list of models saved in a directory, mind you these models must be saved trained models from this experiment since the function expects a specific naming convention
+
+    Args:
+        models_filenames: A list of files which are trained models
+
+    Returns:
+        Trained models represenyed as (word, word_embedding, model_name)    """
+    trained_models = []
+    for m_f in models_filenames:
+        meta_data = m_f.split("_")
+        word = meta_data[0]
+        model = meta_data[-1][:-4]
+        embedding = "_".join(meta_data[1:-1])
+        if word == "POS":
+            word = "_".join(meta_data[:3])
+            embedding = "_".join(meta_data[3:-1])
+        print(word, embedding, model)
+        trained_models.append((word, embedding, model))
+    return trained_models
+
+

@@ -1,8 +1,8 @@
-import os
-import sys
 import argparse
 import datetime
 import glob
+import os
+import sys
 
 import xlsxwriter
 from natsort import natsorted
@@ -10,17 +10,19 @@ from tensorflow.compat.v1.train import summary_iterator
 
 from evaluation import EVALUATION_ROOT as EVALUATION_PATH
 
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser('__file__'))))
+PACKAGE_PARENT = ".."
+SCRIPT_DIR = os.path.dirname(
+    os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser("__file__")))
+)
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
 
 def _process_value(value, data, tag, label, num_chunk):
     num_val: float = round(float(value.strip()), 2)
-    
+
     before_keyword, keyword, after_keyword = tag.partition("Word being trained: ")
     word = after_keyword.split(",")[0]
-    
+
     before_keyword, keyword, after_keyword = tag.partition(
         " Word Embeddings being used: "
     )
@@ -121,12 +123,18 @@ def _save_to_excel(meta_data, data, data_source, run_id):
 
 def main(script_args):
     run_path = "./runs/"
-    run_files = glob.glob(os.path.join(run_path, "*", "")) 
-    run_files_with_id = [run_file for run_file in run_files if run_file.split("/")[2].split("_")[-1] == script_args.run_id]
+    run_files = glob.glob(os.path.join(run_path, "*", ""))
+    run_files_with_id = [
+        run_file
+        for run_file in run_files
+        if run_file.split("/")[2].split("_")[-1] == script_args.run_id
+    ]
     max_date = None
     file_path = ""
     for run_file_with_id in run_files_with_id:
-        tmp_date = datetime.datetime.strptime( "_".join(run_file_with_id.split("/")[2].split("_")[:-2]), "%Y%b%d_%H-%M-%S")
+        tmp_date = datetime.datetime.strptime(
+            "_".join(run_file_with_id.split("/")[2].split("_")[:-2]), "%Y%b%d_%H-%M-%S"
+        )
         if not max_date:
             max_date = tmp_date
             file_path = run_file_with_id
@@ -140,7 +148,7 @@ def main(script_args):
     print(glob.glob(f"{file_path}events.out.tfevents.*"))
     script_args.file_path = glob.glob(f"{file_path}events.out.tfevents.*")[0]
     print(script_args.file_path)
-    
+
     meta_data = set()
     data = {}
     for e in summary_iterator(script_args.file_path):
@@ -158,11 +166,11 @@ def main(script_args):
                     if "Number of word embeddings being trained:" in value:
                         meta_data.add(value)
                     if "Number of words being trained:" in value:
-                        meta_data.add(value) 
-       
+                        meta_data.add(value)
+
             if "Accuracy/text_summary" == tag[-21:]:
                 data = _process_value(value, data, tag, label="Accuracy", num_chunk=21)
-                       
+
             if "_auc/text_summary" == tag[-17:]:
                 data = _process_value(value, data, tag, label="AUC", num_chunk=17)
 

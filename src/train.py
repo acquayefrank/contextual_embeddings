@@ -1,8 +1,8 @@
 import argparse
 import os
 from os.path import isfile, join
-from typing import Any, Union
 from pathlib import Path
+from typing import Any, Union
 
 import torch
 from joblib import Parallel, delayed
@@ -12,20 +12,10 @@ from data import DATA_ROOT as DATA_PATH
 from models import MODELS_PATH
 
 from .models import LogisticRegression, SingleLayeredNN
-from .utils import (
-    DatasetLoader,
-    Logger,
-    _load_word_embedding_model,
-    data_loader,
-    embeddings,
-    evaluate,
-    get_device,
-    get_words,
-    plot_learning_rate,
-    plot_precision_recall,
-    plot_tpr,
-    get_train_run_parser,
-)
+from .utils import (DatasetLoader, Logger, _load_word_embedding_model,
+                    data_loader, embeddings, evaluate, get_device,
+                    get_train_run_parser, get_words, plot_learning_rate,
+                    plot_precision_recall, plot_tpr, get_trained_models )
 
 torch.set_num_threads(4)
 
@@ -158,20 +148,6 @@ def train_on_specific_embedding(
                 print(num_features, file_path, word_embedding)
                 continue
 
-
-def get_trained_models(models_filenames):
-    trained_models = []
-    for m_f in models_filenames:
-        meta_data = m_f.split("_")
-        word = meta_data[0]
-        model = meta_data[-1][:-4]
-        embedding = "_".join(meta_data[1:-1])
-        if word == "POS":
-            word = "_".join(meta_data[:3])
-            embedding = "_".join(meta_data[3:-1])
-        print(word, embedding, model)
-        trained_models.append((word, embedding, model))
-    return trained_models
 
 
 def run_test_on_models(filename, writer, model_data, embedding):
@@ -391,7 +367,6 @@ def main(script_args):
         )
         open(f"{trained_models_root}/{script_args.run_id}.lock", "w").close()
 
-
     embedding: Union[str, Any]
     for embedding in word_embeddings:
 
@@ -402,9 +377,7 @@ def main(script_args):
 
         # Tests for LogisticRegression
         _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-            delayed(run_test_on_models)(
-                filename, writer, model_data, embedding
-            )
+            delayed(run_test_on_models)(filename, writer, model_data, embedding)
             for model_data in get_actual_models(
                 trained_models_root, model_type="LogisticRegression"
             )
@@ -412,14 +385,11 @@ def main(script_args):
 
         # Tests for SingleLayeredNN
         _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-            delayed(run_test_on_models)(
-                filename, writer, model_data, embedding
-            )
+            delayed(run_test_on_models)(filename, writer, model_data, embedding)
             for model_data in get_actual_models(
                 trained_models_root, model_type="SingleLayeredNN"
             )
         )
-
 
     logger.print_time()
     writer.close()

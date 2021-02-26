@@ -15,7 +15,8 @@ import pandas as pd
 
 from data import DATA_ROOT as DATA_PATH
 
-from .utils import _load_word_embedding_model, embeddings, generate_uuid, get_logger
+from .utils import (_load_word_embedding_model, embeddings, generate_uuid,
+                    get_logger)
 
 UUID = generate_uuid()
 num_cores = multiprocessing.cpu_count() - 1
@@ -25,7 +26,7 @@ def get_words_from_embeddings(_logger=None):
     """Gets an intersection of words from all word embeddings available.
 
     This method reads in all word embeddings on the system and finds an intersection of common words.
-    
+
     Args:
         _logger: Expects a _logger object to be passed
 
