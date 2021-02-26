@@ -487,7 +487,7 @@ def get_trained_models(models_filenames):
         models_filenames: A list of files which are trained models
 
     Returns:
-        Trained models represenyed as (word, word_embedding, model_name)    """
+        Trained models represenyed as (word, word_embedding, model_name)"""
     trained_models = []
     for m_f in models_filenames:
         meta_data = m_f.split("_")
@@ -500,5 +500,3 @@ def get_trained_models(models_filenames):
         print(word, embedding, model)
         trained_models.append((word, embedding, model))
     return trained_models
-
-

@@ -2,22 +2,28 @@ import argparse
 from os import listdir
 from os.path import isfile, join
 
-import numpy as np
-import torch
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
+import numpy as np
 import pandas as pd
+import seaborn as sb
+import torch
+from matplotlib import rcParams
 
-from .utils import get_trained_models, embeddings
-from models import MODELS_PATH
 from evaluation import EVALUATION_ROOT as EVALUATION_PATH
+from models import MODELS_PATH
 from src.models import LogisticRegression
+
+from .utils import embeddings, get_trained_models
 
 
 def main(script_args):
     trained_models_root: str = f"{MODELS_PATH}/{script_args.run_id}_trained_models"
-    models = [f for f in listdir(trained_models_root) if isfile(join(trained_models_root, f))]
-    logistic_models = [model for model in models if model.split("_")[-1][:-4] == 'LogisticRegression']
+    models = [
+        f for f in listdir(trained_models_root) if isfile(join(trained_models_root, f))
+    ]
+    logistic_models = [
+        model for model in models if model.split("_")[-1][:-4] == "LogisticRegression"
+    ]
     trained_models = get_trained_models(logistic_models)
     all_named_parameters = {}
     for lg_mdl, t_m in zip(logistic_models, trained_models):
@@ -29,19 +35,57 @@ def main(script_args):
         lg_model.eval()
         named_parameters = list(lg_model.named_parameters())
         dict_key = f"{t_m[1]}_{dim}"
-        weights =  named_parameters[0][1].detach().numpy()
+        weights = named_parameters[0][1].detach().numpy()
         if dict_key not in all_named_parameters:
             all_named_parameters[dict_key] = [(weights, t_m[0])]
         else:
             all_named_parameters[dict_key].append((weights, t_m[0]))
-    
-     
 
-    #for named_parameters in all_named_parameters:
-       # rcParams['figure.figsize'] = 28,12
-       # ax = sns.heatmap(all_named_parameters[named_parameters])
-       # ax.set_title(named_parameters)
-       # plt.savefig(f'{EVALUATION_PATH}/{script_args.run_id}_heatmap_{named_parameters}.png')
+    df = pd.DataFrame(
+        {
+            "embeddings": [
+                key
+                for key in all_named_parameters
+                for data in all_named_parameters[key]
+            ],
+            "words": [
+                data[1]
+                for key in all_named_parameters
+                for data in all_named_parameters[key]
+            ],
+            "weights": [
+                data[0]
+                for key in all_named_parameters
+                for data in all_named_parameters[key]
+            ],
+        }
+    )
+
+    df_m = (
+        df.groupby(["embeddings", "words"])["weights"]
+        .apply(list)
+        .apply(lambda x: np.concatenate(x, axis=0))
+    )
+
+    df_m = df_m.unstack(level=0)
+
+    for column in df_m.columns:
+        words = [index for index, value in df_m[column].items()]
+        weights = [value for index, value in df_m[column].items()]
+        weights = np.concatenate(weights)
+
+        # Plot Heatmaps
+        _, ax = plt.subplots(figsize=(11, 9))
+        sb.heatmap(weights, yticklabels=words)
+        ax.set_title("FASTTEXT_CRAWL_SUB_300 HEATMAP")
+        plt.savefig(f"{EVALUATION_PATH}/{script_args.run_id}_heatmap_{column}.png")
+
+        # Plot Dendograms
+        plot = sb.clustermap(
+            weights, metric="correlation", yticklabels=words, figsize=(15, 13)
+        )
+        plot.fig.suptitle("FASTTEXT_CRAWL_SUB_300 DENDOGRAM")
+        plot.savefig(f"{EVALUATION_PATH}/{script_args.run_id}_dendogram_{column}.png")
 
 
 if __name__ == "__main__":

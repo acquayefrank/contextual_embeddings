@@ -14,8 +14,8 @@ from models import MODELS_PATH
 from .models import LogisticRegression, SingleLayeredNN
 from .utils import (DatasetLoader, Logger, _load_word_embedding_model,
                     data_loader, embeddings, evaluate, get_device,
-                    get_train_run_parser, get_words, plot_learning_rate,
-                    plot_precision_recall, plot_tpr, get_trained_models )
+                    get_train_run_parser, get_trained_models, get_words,
+                    plot_learning_rate, plot_precision_recall, plot_tpr)
 
 torch.set_num_threads(4)
 
@@ -147,7 +147,6 @@ def train_on_specific_embedding(
                 print(e)
                 print(num_features, file_path, word_embedding)
                 continue
-
 
 
 def run_test_on_models(filename, writer, model_data, embedding):
