@@ -1,5 +1,6 @@
 
 # Compositionality of Distributed Data Representation
+Contains the code for my masters thesis on Compositionality of distributed data representation.
 
 
 ## Folder Structure:
@@ -21,10 +22,5 @@ https://spacy.io/usage/linguistic-features#pos-tagging
 
 GLOVE Embeddings:
 https://nlp.stanford.edu/projects/glove/
-
-
-TODO:
-
-* Closest Word: https://stackoverflow.com/questions/37793118/load-pretrained-glove-vectors-in-python
 
 
