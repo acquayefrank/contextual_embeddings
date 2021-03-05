@@ -3,9 +3,6 @@
 Contains the code for my masters thesis on Compositionality of distributed data representation.
 
 
-## Folder Structure:
-
-
 ## Sources of Data and Libraries:
 
 List of words used:
