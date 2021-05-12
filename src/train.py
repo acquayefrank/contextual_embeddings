@@ -12,10 +12,21 @@ from data import DATA_ROOT as DATA_PATH
 from models import MODELS_PATH
 
 from .models import LogisticRegression, SingleLayeredNN
-from .utils import (DatasetLoader, Logger, _load_word_embedding_model,
-                    data_loader, embeddings, evaluate, get_device,
-                    get_train_run_parser, get_trained_models, get_words,
-                    plot_learning_rate, plot_precision_recall, plot_tpr)
+from .utils import (
+    DatasetLoader,
+    Logger,
+    _load_word_embedding_model,
+    data_loader,
+    embeddings,
+    evaluate,
+    get_device,
+    get_train_run_parser,
+    get_trained_models,
+    get_words,
+    plot_learning_rate,
+    plot_precision_recall,
+    plot_tpr,
+)
 
 torch.set_num_threads(4)
 

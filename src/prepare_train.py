@@ -15,8 +15,7 @@ import pandas as pd
 
 from data import DATA_ROOT as DATA_PATH
 
-from .utils import (_load_word_embedding_model, embeddings, generate_uuid,
-                    get_logger)
+from .utils import _load_word_embedding_model, embeddings, generate_uuid, get_logger
 
 UUID = generate_uuid()
 num_cores = multiprocessing.cpu_count() - 1

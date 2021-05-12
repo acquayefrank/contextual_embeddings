@@ -124,28 +124,45 @@ def _save_to_excel(meta_data, data, data_source, run_id):
 def main(script_args):
     run_path = "./runs/"
     run_files = glob.glob(os.path.join(run_path, "*", ""))
-    run_files_with_id = [
-        run_file
-        for run_file in run_files
-        if run_file.split("/")[2].split("_")[-1] == script_args.run_id
-    ]
+
+    if os.name == "nt":
+        print("user is using windows")
+        run_files_with_id = [
+            run_file
+            for run_file in run_files
+            if run_file.split("\\")[1].split("_")[-1] == script_args.run_id
+        ]
+    else:
+        run_files_with_id = [
+            run_file
+            for run_file in run_files
+            if run_file.split("/")[2].split("_")[-1] == script_args.run_id
+        ]
+    print("run_files_with_id: ", run_files_with_id)
     max_date = None
     file_path = ""
     for run_file_with_id in run_files_with_id:
-        tmp_date = datetime.datetime.strptime(
-            "_".join(run_file_with_id.split("/")[2].split("_")[:-2]), "%Y%b%d_%H-%M-%S"
-        )
-        if not max_date:
+        if os.name == "nt":
+            tmp_date = datetime.datetime.strptime(
+                "_".join(run_files_with_id[0].split("\\")[1].split("_")[:-2]),
+                "%Y%b%d_%H-%M-%S",
+            )
+        else:
+            tmp_date = datetime.datetime.strptime(
+                "_".join(run_file_with_id.split("/")[2].split("_")[:-2]),
+                "%Y%b%d_%H-%M-%S",
+            )
+        if max_date is None:
             max_date = tmp_date
             file_path = run_file_with_id
         elif max_date < tmp_date:
             max_date = tmp_date
             file_path = run_file_with_id
 
-    print(max_date)
-    print(script_args.run_id)
-    print(file_path)
-    print(glob.glob(f"{file_path}events.out.tfevents.*"))
+    print("max_date: ", max_date)
+    print("run_id: ", script_args.run_id)
+    print("file_path: ", file_path)
+    print("glob results: ", glob.glob(f"{file_path}events.out.tfevents.*"))
     script_args.file_path = glob.glob(f"{file_path}events.out.tfevents.*")[0]
     print(script_args.file_path)
 

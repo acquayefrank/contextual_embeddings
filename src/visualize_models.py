@@ -77,15 +77,15 @@ def main(script_args):
         # Plot Heatmaps
         _, ax = plt.subplots(figsize=(11, 9))
         sb.heatmap(weights, yticklabels=words)
-        ax.set_title("FASTTEXT_CRAWL_SUB_300 HEATMAP")
+        ax.set_title(f"{column} HEATMAP")
         plt.savefig(f"{EVALUATION_PATH}/{script_args.run_id}_heatmap_{column}.png")
 
-        # Plot Dendograms
+        # Plot Dendrogram
         plot = sb.clustermap(
             weights, metric="correlation", yticklabels=words, figsize=(15, 13)
         )
-        plot.fig.suptitle("FASTTEXT_CRAWL_SUB_300 DENDOGRAM")
-        plot.savefig(f"{EVALUATION_PATH}/{script_args.run_id}_dendogram_{column}.png")
+        plot.fig.suptitle(f"{column} DENDROGRAM")
+        plot.savefig(f"{EVALUATION_PATH}/{script_args.run_id}_dendrogram_{column}.png")
 
 
 if __name__ == "__main__":
