@@ -127,6 +127,7 @@ def main(script_args):
         em_path, em_dim, em_type = embeddings.get(embedding_name)
         model = _load_word_embedding_model(file=em_path, word_embedding_type=em_type)
         headers = [
+            "Training Scenario",
             "Accuracy - Logistic Regression",
             "AUC - Logistic Regression",
             "Accuracy - Single Layered Neural Network",
@@ -167,6 +168,7 @@ def main(script_args):
             lr_scores = evaluate(lr_model, x_data, y_data)
 
             results = [
+                word,
                 lr_scores["_accuracy"],
                 lr_scores["_auc"],
                 nn_scores["_accuracy"],
