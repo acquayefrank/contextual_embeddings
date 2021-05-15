@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
-from models import MODELS_PATH
+import argparse
+import csv
+import datetime
+
+import pandas as pd
+import torch
+from gensim.models import KeyedVectors
+from torch.autograd import Variable
+
 from data import DATA_ROOT
 from evaluation import EVALUATION_ROOT
-from gensim.models import KeyedVectors
-from src.utils import embeddings
-import pandas as pd
-import argparse
+from models import MODELS_PATH
 from src.models import LogisticRegression, SingleLayeredNN
-from src.utils import evaluate, get_train_run_parser
-import torch
-from torch.autograd import Variable
-import csv
+from src.utils import embeddings, evaluate, get_train_run_parser
 
 
 def _load_word_embedding_model(
@@ -130,7 +132,7 @@ def main(script_args):
             "Accuracy - Single Layered Neural Network",
             "AUC - Single Layered Neural Network",
         ]
-        emb_file_name = f"{EVALUATION_ROOT}/{embedding_name}_results.csv"
+        emb_file_name = f'{EVALUATION_ROOT}/{embedding_name}_{script_args.data_source}_test_results_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.csv'
         with open(emb_file_name, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(headers)

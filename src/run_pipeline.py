@@ -3,9 +3,9 @@ from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
 
-from .generate_report import main as main_generate_report
 from .prepare_train import main as main_prepare_train
 from .process_train import main as main_process_train
+from .run_valid_test import main as main_valid_test
 from .train import main as main_train
 from .utils import generate_uuid, get_logger, get_train_run_parser
 from .visualize_models import main as main_visualize_models
@@ -50,7 +50,7 @@ def main(script_args):
         print("models already trained")
 
     print(f"UUID for run is: {script_args.run_id}")
-    main_generate_report(script_args)
+    main_valid_test(script_args)
     print(f"UUID for run is: {script_args.run_id}")
     main_visualize_models(script_args)
     print(
