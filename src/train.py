@@ -160,8 +160,12 @@ def train_on_specific_embedding(
                 continue
 
 
-def run_test_on_models(filename, writer, model_data, embedding):
+def run_test_on_models(filename, writer, model_data, embedding, run_id):
     model = model_data[0]
+    model.load_state_dict(
+        torch.load(f"{MODELS_PATH}/{run_id}_trained_models/{model_data[3]}")
+    )
+    model.eval()
     word = model_data[1]
     emb_name = model_data[2]
 
@@ -272,9 +276,9 @@ def get_actual_models(trained_models_root, model_type):
             word = "_".join(mdl.split("_")[:3])
         file_path, dim, embedding_type = embeddings_data
         if model_type == "LogisticRegression":
-            models.append((LogisticRegression(dim, 1), word, emb_name))
+            models.append((LogisticRegression(dim, 1), word, emb_name, mdl))
         elif model_type == "SingleLayeredNN":
-            models.append((SingleLayeredNN(dim, dim, 1), word, emb_name))
+            models.append((SingleLayeredNN(dim, dim, 1), word, emb_name, mdl))
     return models
 
 
@@ -385,9 +389,14 @@ def main(script_args):
             file=file_path, word_embedding_type=embedding_type
         )
 
+        print(
+            "about to run tests ###########################################################################################################"
+        )
         # Tests for LogisticRegression
         _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-            delayed(run_test_on_models)(filename, writer, model_data, embedding)
+            delayed(run_test_on_models)(
+                filename, writer, model_data, embedding, script_args.run_id
+            )
             for model_data in get_actual_models(
                 trained_models_root, model_type="LogisticRegression"
             )
@@ -395,7 +404,9 @@ def main(script_args):
 
         # Tests for SingleLayeredNN
         _ = Parallel(n_jobs=8, backend="sequential", verbose=5)(
-            delayed(run_test_on_models)(filename, writer, model_data, embedding)
+            delayed(run_test_on_models)(
+                filename, writer, model_data, embedding, script_args.run_id
+            )
             for model_data in get_actual_models(
                 trained_models_root, model_type="SingleLayeredNN"
             )
