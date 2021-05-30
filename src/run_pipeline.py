@@ -9,6 +9,7 @@ from .run_valid_test import main as main_valid_test
 from .train import main as main_train
 from .utils import generate_uuid, get_logger, get_train_run_parser
 from .visualize_models import main as main_visualize_models
+from .cross_validation import main as main_cross_validation
 
 UUID = generate_uuid()
 
@@ -53,6 +54,9 @@ def main(script_args):
     main_valid_test(script_args)
     print(f"UUID for run is: {script_args.run_id}")
     main_visualize_models(script_args)
+    print(f"UUID for run is: {script_args.run_id}")
+    print(f"Starting cross validation")
+    main_cross_validation(script_args)
     print(
         f"processing is done, copy and share your results. UUID for run is: {script_args.run_id}"
     )

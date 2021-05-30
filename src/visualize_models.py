@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sb
 import torch
-from matplotlib import rcParams
 
 from evaluation import EVALUATION_ROOT as EVALUATION_PATH
 from models import MODELS_PATH

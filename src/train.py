@@ -259,14 +259,6 @@ def main(script_args):
         )
         open(f"{trained_models_root}/{script_args.run_id}.lock", "w").close()
 
-    embedding: Union[str, Any]
-    for embedding in word_embeddings:
-
-        file_path, _, embedding_type = embeddings.get(embedding)
-        utils.WORD_EMBEDDINGS_MODEL = _load_word_embedding_model(
-            file=file_path, word_embedding_type=embedding_type
-        )
-
     logger.print_time()
     writer.close()
     open(f"./runs/{script_args.run_id}.lock", "w").close()
